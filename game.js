@@ -11,9 +11,13 @@ class StartScene extends Phaser.Scene {
     create() {
         this.add.image(400, 300, 'start_bg').setDisplaySize(800, 600);
         this.add.text(250, 100, 'Feed GLUTT!', { fontSize: '64px', fill: '#fff' });
-        this.add.text(200, 300, 'Press ENTER to Start', { fontSize: '32px', fill: '#fff' });
+        this.add.text(200, 300, 'Press ENTER or Tap to Start', { fontSize: '32px', fill: '#fff' });
 
         this.input.keyboard.on('keydown-ENTER', () => {
+            this.scene.start('GameScene');
+        });
+
+        this.input.on('pointerdown', () => {
             this.scene.start('GameScene');
         });
     }
@@ -28,7 +32,6 @@ class GameScene extends Phaser.Scene {
     preload() {
         this.load.image('game_bg', 'assets/backgrounds/default_bg.png');
         this.load.image('player', 'assets/player/default_player.png');
-
         for (let i = 1; i <= 7; i++) {
             this.load.image(`object${i}`, `assets/objects/default_object${i}.png`);
         }
@@ -39,11 +42,9 @@ class GameScene extends Phaser.Scene {
         hunger = 10;
 
         this.add.image(400, 300, 'game_bg').setDisplaySize(800, 600);
-
         this.player = this.physics.add.sprite(400, 500, 'player').setDisplaySize(200, 200).setImmovable();
 
         this.cursors = this.input.keyboard.createCursorKeys();
-
         this.objects = this.physics.add.group();
 
         this.objectTimer = this.time.addEvent({
@@ -53,8 +54,44 @@ class GameScene extends Phaser.Scene {
             loop: true
         });
 
+        this.hungerTimer = this.time.addEvent({
+            delay: 1000,
+            callback: () => {
+                hunger = Math.max(0, hunger - 1);
+                this.hungerText.setText(`Hunger: ${hunger}%`);
+
+                if (hunger <= LOSING_HUNGER_THRESHOLD) {
+                    this.scene.start('GameOverScene');
+                }
+            },
+            callbackScope: this,
+            loop: true
+        });
+
         this.scoreText = this.add.text(10, 10, 'Score: 0', { fontSize: '24px', fill: '#fff' });
         this.hungerText = this.add.text(10, 40, 'Hunger: 10%', { fontSize: '24px', fill: '#fff' });
+
+        // Swipe / Touch support
+        this.input.on('pointerdown', pointer => {
+            this.touchStartX = pointer.x;
+        });
+
+        this.input.on('pointermove', pointer => {
+            if (this.touchStartX !== undefined) {
+                const dx = pointer.x - this.touchStartX;
+                if (dx > 20) {
+                    this.moveRight();
+                    this.touchStartX = pointer.x;  // Reset swipe origin
+                } else if (dx < -20) {
+                    this.moveLeft();
+                    this.touchStartX = pointer.x;  // Reset swipe origin
+                }
+            }
+        });
+
+        this.input.on('pointerup', () => {
+            this.touchStartX = undefined;
+        });
     }
 
     spawnObject() {
@@ -72,15 +109,14 @@ class GameScene extends Phaser.Scene {
         const x = Phaser.Math.Between(32, 768);
         const obj = this.objects.create(x, -32, objData.key).setDisplaySize(64, 64);
         obj.value = objData.value;
-        obj.speed = Phaser.Math.Between(100, 200);
-        obj.setVelocityY(obj.speed);
+        obj.setVelocityY(Phaser.Math.Between(100, 200));
     }
 
     update() {
         if (this.cursors.left.isDown) {
-            this.player.x = Math.max(100, this.player.x - 10);
+            this.moveLeft();
         } else if (this.cursors.right.isDown) {
-            this.player.x = Math.min(700, this.player.x + 10);
+            this.moveRight();
         }
 
         this.objects.getChildren().forEach(obj => {
@@ -103,6 +139,14 @@ class GameScene extends Phaser.Scene {
                 }
             }
         });
+    }
+
+    moveLeft() {
+        this.player.x = Math.max(100, this.player.x - 10);
+    }
+
+    moveRight() {
+        this.player.x = Math.min(700, this.player.x + 10);
     }
 }
 
@@ -139,15 +183,19 @@ class GameOverScene extends Phaser.Scene {
 
     create() {
         this.add.text(250, 250, 'Game Over', { fontSize: '64px', fill: '#fff' });
-        this.add.text(200, 350, 'Press ENTER to Retry', { fontSize: '32px', fill: '#fff' });
+        this.add.text(200, 350, 'Press ENTER or Tap to Retry', { fontSize: '32px', fill: '#fff' });
 
         this.input.keyboard.on('keydown-ENTER', () => {
+            this.scene.start('StartScene');
+        });
+
+        this.input.on('pointerdown', () => {
             this.scene.start('StartScene');
         });
     }
 }
 
-// Now define config + game AFTER the classes
+// Config + Game
 const config = {
     type: Phaser.AUTO,
     width: 800,
