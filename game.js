@@ -78,26 +78,19 @@ class GameScene extends Phaser.Scene {
 
         // Swipe / Touch support
         this.input.on('pointerdown', pointer => {
-            this.touchStartX = pointer.x;
-        });
-
-        this.input.on('pointermove', pointer => {
-            if (this.touchStartX !== undefined) {
-                const dx = pointer.x - this.touchStartX;
-                if (dx > 20) {
-                    this.moveRight();
-                    this.touchStartX = pointer.x;  // Reset swipe origin
-                } else if (dx < -20) {
-                    this.moveLeft();
-                    this.touchStartX = pointer.x;  // Reset swipe origin
-                }
+                this.touchStartX = pointer.x;
+            });
+        
+        this.input.on('pointermove', (pointer) => {
+            if (pointer.isDown) {
+                this.player.x = Phaser.Math.Clamp(pointer.x, this.player.displayWidth / 2, this.scale.width - this.player.displayWidth / 2);
             }
         });
-
+        
         this.input.on('pointerup', () => {
             this.touchStartX = undefined;
         });
-    }
+     }
 
     spawnObject() {
         const objTypes = [
