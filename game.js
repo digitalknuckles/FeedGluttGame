@@ -39,7 +39,7 @@ class GameScene extends Phaser.Scene {
 
     create() {
         score = 0;
-        hunger = 10;
+        hunger = 50;
 
         this.add.image(400, 300, 'game_bg').setDisplaySize(800, 600);
         this.player = this.physics.add.sprite(400, 500, 'player').setDisplaySize(200, 200).setImmovable();
