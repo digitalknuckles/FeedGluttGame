@@ -100,7 +100,7 @@ class GameScene extends Phaser.Scene {
             { key: 'object4', value: 5 },
             { key: 'object5', value: 5 },
             { key: 'object6', value: 5 },
-            { key: 'object7', value: -5 }
+            { key: 'object7', value: -10 }
         ];
 
         const objData = Phaser.Utils.Array.GetRandom(objTypes);
