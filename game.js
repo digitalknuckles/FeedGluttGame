@@ -43,7 +43,7 @@ class GameScene extends Phaser.Scene {
 
         this.add.image(400, 300, 'game_bg').setDisplaySize(800, 600);
         this.player = this.physics.add.sprite(400, 500, 'player').setDisplaySize(200, 200).setImmovable();
-        .setImmovable();
+        //.setImmovable();
 
         // Set a smaller hitbox: 100x100 centered
         this.player.body.setSize(100, 100);
