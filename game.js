@@ -62,7 +62,7 @@ class GameScene extends Phaser.Scene {
         this.hungerTimer = this.time.addEvent({
             delay: 1000,
             callback: () => {
-                hunger = Math.max(0, hunger - 1);
+                hunger = Math.max(0, hunger - 5);
                 this.hungerText.setText(`Hunger: ${hunger}%`);
 
                 if (hunger <= LOSING_HUNGER_THRESHOLD) {
@@ -213,6 +213,6 @@ const game = new Phaser.Game(config);
 
 // Shared variables
 let score = 0;
-let hunger = 10;
+let hunger = 50;
 const WINNING_SCORE = 500;
 const LOSING_HUNGER_THRESHOLD = 0;
