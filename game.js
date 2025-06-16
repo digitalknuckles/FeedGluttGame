@@ -1,26 +1,3 @@
-const config = {
-    type: Phaser.AUTO,
-    width: 800,
-    height: 600,
-    backgroundColor: '#000000',
-    physics: {
-        default: 'arcade',
-        arcade: {
-            gravity: { y: 0 },
-            debug: false
-        }
-    },
-    scene: [StartScene, GameScene, VictoryScene, GameOverScene]
-};
-
-const game = new Phaser.Game(config);
-
-// Shared game variables
-let score = 0;
-let hunger = 10;
-const WINNING_SCORE = 500;
-const LOSING_HUNGER_THRESHOLD = 0;
-
 // Start Scene
 class StartScene extends Phaser.Scene {
     constructor() {
@@ -138,7 +115,6 @@ class VictoryScene extends Phaser.Scene {
     preload() {
         this.load.image('victory1', 'assets/Feed_Glutt/victory1.png');
         this.load.image('victory2', 'assets/Feed_Glutt/victory2.png');
-        // load more as needed
     }
 
     create() {
@@ -147,7 +123,7 @@ class VictoryScene extends Phaser.Scene {
         this.add.image(400, 300, chosen).setDisplaySize(400, 400);
         this.add.text(150, 50, 'You Fed Glutt!', { fontSize: '64px', fill: '#fff' });
 
-        const mintButton = this.add.text(300, 550, 'Mint Collectible', { fontSize: '32px', fill: '#0f0', backgroundColor: '#000' })
+        this.add.text(300, 550, 'Mint Collectible', { fontSize: '32px', fill: '#0f0', backgroundColor: '#000' })
             .setInteractive()
             .on('pointerdown', () => {
                 window.open('https://opensea.io/collection/gluttog/overview', '_blank');
@@ -170,3 +146,27 @@ class GameOverScene extends Phaser.Scene {
         });
     }
 }
+
+// Now define config + game AFTER the classes
+const config = {
+    type: Phaser.AUTO,
+    width: 800,
+    height: 600,
+    backgroundColor: '#000000',
+    physics: {
+        default: 'arcade',
+        arcade: {
+            gravity: { y: 0 },
+            debug: false
+        }
+    },
+    scene: [StartScene, GameScene, VictoryScene, GameOverScene]
+};
+
+const game = new Phaser.Game(config);
+
+// Shared variables
+let score = 0;
+let hunger = 10;
+const WINNING_SCORE = 500;
+const LOSING_HUNGER_THRESHOLD = 0;
