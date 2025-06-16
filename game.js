@@ -168,7 +168,7 @@ class VictoryScene extends Phaser.Scene {
         this.add.text(300, 550, 'Mint Collectible', { fontSize: '32px', fill: '#0f0', backgroundColor: '#000' })
             .setInteractive()
             .on('pointerdown', () => {
-                window.open('https://opensea.io/collection/gluttog/overview', '_blank');
+                window.open('https://opensea.io/collection/gluttog/', '_blank');
             });
     }
 }
