@@ -1,18 +1,5 @@
 // ==========================
-// Global Game State
-// ==========================
-let score = 0;
-let hunger = 100;
-
-const GAME_CONFIG = {
-    START_HUNGER: 100,
-    LOSING_HUNGER: 0,
-    OBJECT_SPAWN_RATE: 900,
-    WINNING_SCORE: 100
-};
-
-// ==========================
-// Game Scene (Hook + Rope Sway)
+// Game Scene (Optimized Mobile UX + Hook Mechanic + Particles)
 // ==========================
 class GameScene extends Phaser.Scene {
     constructor() {
@@ -20,56 +7,59 @@ class GameScene extends Phaser.Scene {
     }
 
     preload() {
-        // Core assets
         this.load.image('game_bg', 'assets/backgrounds/default_bg.png');
         this.load.image('player', 'assets/player/default_player.png');
+        this.load.image('spark', 'assets/particles/spark.png'); // particle effect
 
-        // Rope segment
-        this.load.image('rope_segment', 'assets/objects/rope_segment.png');
-
-        // Falling objects
         for (let i = 1; i <= 7; i++) {
             this.load.image(`object${i}`, `assets/objects/default_object${i}.png`);
         }
     }
 
     create() {
-        const { width, height } = this.scale;
-        console.log('GameScene started');
-
         score = 0;
         hunger = GAME_CONFIG.START_HUNGER;
 
-        // Background (guaranteed to show)
+        const { width, height } = this.scale;
+
+        // Background
         this.add.image(width / 2, height / 2, 'game_bg').setDisplaySize(width, height);
 
         // Player
         this.player = this.physics.add.sprite(width / 2, height * 0.85, 'player')
             .setDisplaySize(120, 120)
             .setImmovable(true);
-        this.player.body.setSize(60, 60).setOffset(30, 30);
+        this.player.body.setSize(60, 60);
+        this.player.body.setOffset(30, 30);
 
-        // Falling objects
+        // Group for falling objects
         this.objects = this.physics.add.group();
         this.physics.add.overlap(this.player, this.objects, this.collectObject, null, this);
 
-        // Hook system
+        // Particles
+        this.particles = this.add.particles('spark');
+        this.collectEmitter = this.particles.createEmitter({
+            x: 0,
+            y: 0,
+            speed: { min: -100, max: 100 },
+            scale: { start: 0.5, end: 0 },
+            alpha: { start: 1, end: 0 },
+            lifespan: 400,
+            quantity: 8,
+            on: false
+        });
+
+        // Hook mechanics
         this.hookActive = false;
         this.hookObject = null;
         this.hookRetracting = false;
         this.hookSpawnX = null;
-
-        // Rope as tileSprite
-        this.rope = this.add.tileSprite(0, 0, 4, 1, 'rope_segment');
-        this.rope.setOrigin(0.5, 0);
-        this.rope.displayHeight = 1;
-        this.rope.setDepth(1);
-        this.rope.setVisible(false);
+        this.hookCable = this.add.graphics();
 
         // UI
         this.createUI();
 
-        // Spawn objects loop
+        // Spawn Objects
         this.time.addEvent({
             delay: GAME_CONFIG.OBJECT_SPAWN_RATE,
             loop: true,
@@ -77,18 +67,20 @@ class GameScene extends Phaser.Scene {
             callbackScope: this
         });
 
-        // Hunger timer
+        // Hunger Timer
         this.time.addEvent({
             delay: 1000,
             loop: true,
             callback: () => {
                 hunger = Math.max(0, hunger - 5);
                 this.updateUI();
-                if (hunger <= GAME_CONFIG.LOSING_HUNGER) this.scene.start('GameOverScene');
+                if (hunger <= GAME_CONFIG.LOSING_HUNGER) {
+                    this.scene.start('GameOverScene');
+                }
             }
         });
 
-        // Swipe / touch movement
+        // Swipe / Touch movement
         this.input.on('pointermove', pointer => {
             if (pointer.isDown) {
                 this.player.x = Phaser.Math.Clamp(
@@ -123,7 +115,7 @@ class GameScene extends Phaser.Scene {
             { key: 'object3', value: 15 },
             { key: 'object4', value: 5 },
             { key: 'object5', value: 5 },
-            { key: 'object6', value: 5, isHook: true },
+            { key: 'object6', value: 5, isHook: true }, // claw/hook object
             { key: 'object7', value: -50 }
         ];
 
@@ -134,22 +126,24 @@ class GameScene extends Phaser.Scene {
         obj.setVelocityY(Phaser.Math.Between(120, 220));
         obj.isHook = data.isHook || false;
 
+        // Initialize hook if spawned
         if (obj.isHook && !this.hookActive) {
             this.hookActive = true;
             this.hookObject = obj;
             this.hookRetracting = false;
             this.hookSpawnX = x;
-            this.rope.visible = true;
-            this.rope.displayHeight = 1;
-            this.rope.x = x;
         }
     }
 
     collectObject(player, obj) {
-        if (obj.isHook) return;
+        if (obj.isHook) return; // hook handled in update()
         score += obj.value;
         hunger = Phaser.Math.Clamp(hunger + obj.value, 0, 100);
+
+        // Particle effect
+        this.collectEmitter.explode(12, obj.x, obj.y);
         obj.destroy();
+
         this.updateUI();
 
         if (score >= GAME_CONFIG.WINNING_SCORE && hunger === 100) this.scene.start('VictoryScene');
@@ -170,32 +164,35 @@ class GameScene extends Phaser.Scene {
         if (this.hookActive && this.hookObject) {
             const hook = this.hookObject;
 
-            // Soft sway
-            const sway = Math.sin(this.time.now * 0.005) * 10;
-            this.rope.x = this.hookSpawnX + sway;
-            this.rope.displayHeight = Math.max(1, hook.y);
+            // Draw cable
+            this.hookCable.clear();
+            this.hookCable.lineStyle(4, 0xffffff);
+            this.hookCable.beginPath();
+            this.hookCable.moveTo(this.hookSpawnX, 0); // top spawn
+            this.hookCable.lineTo(hook.x, hook.y);
+            this.hookCable.strokePath();
 
-            // Retract when player collides
+            // Collision with player triggers retract
             if (!this.hookRetracting && Phaser.Geom.Intersects.RectangleToRectangle(this.player.getBounds(), hook.getBounds())) {
                 this.hookRetracting = true;
-                hook.setVelocityY(-200);
+                hook.setVelocityY(-200); // retract speed
             }
 
-            // Player attached while retracting
+            // Retract player with hook
             if (this.hookRetracting) {
-                this.player.y = hook.y + 60;
+                this.player.y = hook.y + 60; // player "attached"
                 if (hook.y <= 0) {
-                    this.rope.visible = false;
-                    this.scene.start('GameOverScene');
+                    this.hookCable.clear();
+                    this.scene.start('GameOverScene'); // player pulled to top → fail
                 }
             }
 
-            // Hook falls off screen
+            // Destroy hook if falls out of scene without player collision
             if (hook.y > this.scale.height + 32 && !this.hookRetracting) {
                 hook.destroy();
+                this.hookCable.clear();
                 this.hookActive = false;
                 this.hookObject = null;
-                this.rope.visible = false;
             }
         }
 
@@ -203,26 +200,3 @@ class GameScene extends Phaser.Scene {
         this.updateUI();
     }
 }
-
-// ==========================
-// Phaser Game Config
-// ==========================
-const config = {
-    type: Phaser.AUTO,
-    width: 390,
-    height: 844,
-    backgroundColor: '#000000',
-    physics: {
-        default: 'arcade',
-        arcade: {
-            gravity: { y: 0 },
-            debug: false
-        }
-    },
-    scene: [GameScene]
-};
-
-// ==========================
-// Start Game
-// ==========================
-new Phaser.Game(config);
