@@ -38,6 +38,8 @@ class GameScene extends Phaser.Scene {
 
     create() {
 
+        this.cameras.main.setBackgroundColor('#1e1e1e');
+
         console.log('GameScene started');
         score = 0;
         hunger = GAME_CONFIG.START_HUNGER;
@@ -198,7 +200,7 @@ class GameScene extends Phaser.Scene {
             // Soft sway animation
             const sway = Math.sin(this.time.now * 0.005) * 10; // sway amplitude 10px
             this.rope.x = this.hookSpawnX + sway;
-            this.rope.height = hook.y;
+            this.rope.displayHeight = hook.y;
 
             // Retract when player collides
             if (!this.hookRetracting && Phaser.Geom.Intersects.RectangleToRectangle(this.player.getBounds(), hook.getBounds())) {
