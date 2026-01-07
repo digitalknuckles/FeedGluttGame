@@ -78,11 +78,11 @@ class GameScene extends Phaser.Scene {
         this.hookSpawnX = null;
 
         // Rope as tileSprite (GPU-accelerated)
-        this.rope = this.add.tileSprite(0, 0, 4, 1, 'rope_segment')
-            .setOrigin(0.5, 0)
-            .setDisplayHeight(1)
-            .setDepth(1)
-            .setVisible(false);
+        this.rope = this.add.tileSprite(0, 0, 4, 1, 'rope_segment');
+        this.rope.setOrigin(0.5, 0);
+        this.rope.displayHeight = 1; // directly set property
+        this.rope.setDepth(1);
+        this.rope.setVisible(false);
 
         // Spark trail along rope
         this.ropeEmitter = this.add.particles('spark').createEmitter({
