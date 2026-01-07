@@ -69,10 +69,7 @@ class StartScene extends Phaser.Scene {
 }
 
 // ==========================
-// Game Scene (Optimized Mobile UX)
-// ==========================
-// ==========================
-// Game Scene (Hook + Rope Sway + Particles)
+// Game Scene (Hook + Rope + Particles)
 // ==========================
 class GameScene extends Phaser.Scene {
     constructor() {
@@ -83,7 +80,7 @@ class GameScene extends Phaser.Scene {
         this.load.image('game_bg', 'assets/backgrounds/default_bg.png');
         this.load.image('player', 'assets/player/default_player.png');
 
-        // Rope and spark
+        // Rope and spark particles
         this.load.image('rope_segment', 'assets/objects/rope_segment.png');
         this.load.image('spark', 'assets/particles/spark.png');
 
@@ -95,10 +92,9 @@ class GameScene extends Phaser.Scene {
     create() {
         score = 0;
         hunger = GAME_CONFIG.START_HUNGER;
-
         const { width, height } = this.scale;
 
-        // Background guaranteed to show
+        // Background
         this.add.image(width / 2, height / 2, 'game_bg').setDisplaySize(width, height);
 
         // Player
@@ -108,14 +104,14 @@ class GameScene extends Phaser.Scene {
         this.player.body.setSize(60, 60);
         this.player.body.setOffset(30, 30);
 
-        // Falling objects
+        // Objects
         this.objects = this.physics.add.group();
         this.physics.add.overlap(this.player, this.objects, this.collectObject, null, this);
 
-        // Rope setup (hidden until hook spawns)
+        // Rope & hook setup
         this.hookActive = false;
-        this.hookObject = null;
         this.hookSpawned = false;
+        this.hookObject = null;
         this.hookSpawnX = 0;
         this.hookRetracting = false;
 
@@ -123,7 +119,6 @@ class GameScene extends Phaser.Scene {
             .setOrigin(0.5, 0)
             .setVisible(false);
 
-        // Rope particle
         this.ropeEmitter = this.add.particles('spark').createEmitter({
             speed: 0,
             scale: { start: 0.2, end: 0 },
@@ -138,7 +133,7 @@ class GameScene extends Phaser.Scene {
         // UI
         this.createUI();
 
-        // Spawn objects
+        // Spawn objects loop
         this.time.addEvent({
             delay: GAME_CONFIG.OBJECT_SPAWN_RATE,
             loop: true,
@@ -166,6 +161,19 @@ class GameScene extends Phaser.Scene {
         this.cursors = this.input.keyboard.createCursorKeys();
     }
 
+    createUI() {
+        this.ui = this.add.container(16, 16);
+        this.scoreText = this.add.text(0, 0, `Score: ${score}`, { fontSize: '20px', color: '#fff' });
+        this.hungerText = this.add.text(0, 28, `Hunger: ${hunger}%`, { fontSize: '20px', color: '#0f0' });
+        this.ui.add([this.scoreText, this.hungerText]);
+        this.ui.setScrollFactor(0);
+    }
+
+    updateUI() {
+        this.scoreText.setText(`Score: ${score}`);
+        this.hungerText.setText(`Hunger: ${hunger}%`);
+    }
+
     spawnObject() {
         const types = [
             { key: 'object1', value: 1 },
@@ -178,11 +186,7 @@ class GameScene extends Phaser.Scene {
         ];
 
         let data = Phaser.Utils.Array.GetRandom(types);
-
-        // Spawn hook only once
-        if (data.isHook && this.hookSpawned) {
-            data = types.find(t => !t.isHook);
-        }
+        if (data.isHook && this.hookSpawned) data = types.find(t => !t.isHook);
 
         const x = Phaser.Math.Between(32, this.scale.width - 32);
         const obj = this.objects.create(x, -32, data.key).setDisplaySize(56, 56);
@@ -203,7 +207,7 @@ class GameScene extends Phaser.Scene {
     }
 
     collectObject(player, obj) {
-        if (obj.isHook) return; // hook handled separately
+        if (obj.isHook) return;
         score += obj.value;
         hunger = Phaser.Math.Clamp(hunger + obj.value, 0, 100);
         obj.destroy();
@@ -258,6 +262,53 @@ class GameScene extends Phaser.Scene {
 }
 
 // ==========================
+// Victory Scene (Restart Added)
+// ==========================
+class VictoryScene extends Phaser.Scene {
+    constructor() {
+        super('VictoryScene');
+    }
+
+    preload() {
+        this.load.image('victory1', 'assets/Feed_Glutt/victory1.png');
+        this.load.image('victory2', 'assets/Feed_Glutt/victory2.png');
+    }
+
+    create() {
+        const { width, height } = this.scale;
+        const key = Phaser.Utils.Array.GetRandom(['victory1', 'victory2']);
+
+        this.add.image(width / 2, height / 2, key)
+            .setDisplaySize(width * 0.6, width * 0.6);
+
+        this.add.text(width / 2, height * 0.15, 'You Fed Glutt!', {
+            fontSize: 'clamp(32px, 7vw, 56px)',
+            color: '#fff'
+        }).setOrigin(0.5);
+
+        this.createButton(width / 2, height * 0.75, 'Play Again', () => this.scene.start('StartScene'));
+        this.createButton(width / 2, height * 0.85, 'Mint Collectible', () => {
+            window.open('https://opensea.io/collection/glutts', '_blank');
+        });
+    }
+
+    createButton(x, y, label, callback) {
+        const btn = this.add.text(x, y, label, {
+            fontSize: '24px',
+            color: '#fff',
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            padding: { x: 20, y: 12 },
+            align: 'center'
+        }).setOrigin(0.5).setInteractive();
+
+        btn.on('pointerdown', callback);
+        btn.on('pointerover', () => btn.setScale(1.05));
+        btn.on('pointerout', () => btn.setScale(1));
+        return btn;
+    }
+}
+
+// ==========================
 // Game Over Scene
 // ==========================
 class GameOverScene extends Phaser.Scene {
@@ -277,14 +328,14 @@ class GameOverScene extends Phaser.Scene {
 }
 
 // ==========================
-// Game Config (Mobile + iframe optimized)
+// Game Config
 // ==========================
 const config = {
     type: Phaser.AUTO,
     scale: {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH,
-        width: 390,  // mobile ratio
+        width: 390,
         height: 844
     },
     parent: 'game-container',
@@ -300,12 +351,3 @@ const config = {
 // Start Game
 // ==========================
 const game = new Phaser.Game(config);
-
-// ==========================
-// CSS (iframe & animation_url friendly)
-// ==========================
-// Add to your HTML:
-// <style>
-// html, body { margin:0; padding:0; background:#000; overflow:hidden; }
-// canvas { touch-action:none; }
-// </style>
