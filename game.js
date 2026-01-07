@@ -1,4 +1,19 @@
-// Start Scene
+// ==========================
+// Shared Constants
+// ==========================
+const GAME_CONFIG = {
+    START_HUNGER: 50,
+    WINNING_SCORE: 500,
+    LOSING_HUNGER: 0,
+    OBJECT_SPAWN_RATE: 350 // ms
+};
+
+let score = 0;
+let hunger = GAME_CONFIG.START_HUNGER;
+
+// ==========================
+// Start Scene (Modern UI)
+// ==========================
 class StartScene extends Phaser.Scene {
     constructor() {
         super('StartScene');
@@ -9,21 +24,53 @@ class StartScene extends Phaser.Scene {
     }
 
     create() {
-        this.add.image(400, 300, 'start_bg').setDisplaySize(800, 600);
-        this.add.text(250, 100, 'Feed GLUTT!', { fontSize: '64px', fill: '#fff' });
-        this.add.text(200, 300, 'Press ENTER or Tap to Start', { fontSize: '32px', fill: '#fff' });
+        const { width, height } = this.scale;
 
-        this.input.keyboard.on('keydown-ENTER', () => {
-            this.scene.start('GameScene');
+        // Background
+        this.add.image(width / 2, height / 2, 'start_bg')
+            .setDisplaySize(width, height);
+
+        // Animated Title
+        const title = this.add.text(width / 2, height * 0.25, 'Feed GLUTT!', {
+            fontFamily: 'Arial Black',
+            fontSize: 'clamp(36px, 8vw, 64px)',
+            color: '#ffffff'
+        }).setOrigin(0.5);
+
+        this.tweens.add({
+            targets: title,
+            y: title.y + 10,
+            duration: 800,
+            yoyo: true,
+            repeat: -1
         });
 
-        this.input.on('pointerdown', () => {
-            this.scene.start('GameScene');
-        });
+        // Start Button
+        this.createButton(width / 2, height * 0.6, 'Tap to Start', () => this.scene.start('GameScene'));
+    }
+
+    createButton(x, y, label, callback) {
+        const btn = this.add.text(x, y, label, {
+            fontSize: '28px',
+            color: '#fff',
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            padding: { x: 24, y: 14 },
+            align: 'center'
+        })
+        .setOrigin(0.5)
+        .setInteractive({ useHandCursor: true });
+
+        btn.on('pointerdown', callback);
+        btn.on('pointerover', () => btn.setScale(1.05));
+        btn.on('pointerout', () => btn.setScale(1));
+
+        return btn;
     }
 }
 
-// Game Scene
+// ==========================
+// Game Scene (Optimized Mobile UX)
+// ==========================
 class GameScene extends Phaser.Scene {
     constructor() {
         super('GameScene');
@@ -32,6 +79,7 @@ class GameScene extends Phaser.Scene {
     preload() {
         this.load.image('game_bg', 'assets/backgrounds/default_bg.png');
         this.load.image('player', 'assets/player/default_player.png');
+
         for (let i = 1; i <= 7; i++) {
             this.load.image(`object${i}`, `assets/objects/default_object${i}.png`);
         }
@@ -39,59 +87,79 @@ class GameScene extends Phaser.Scene {
 
     create() {
         score = 0;
-        hunger = 50;
+        hunger = GAME_CONFIG.START_HUNGER;
 
-        this.add.image(400, 300, 'game_bg').setDisplaySize(800, 600);
-        this.player = this.physics.add.sprite(400, 500, 'player').setDisplaySize(200, 200).setImmovable();
-        // Set a smaller hitbox: 100x100 centered
-        this.player.body.setSize(50, 50);
-        this.player.body.setOffset(52, 25);
+        const { width, height } = this.scale;
 
-        this.cursors = this.input.keyboard.createCursorKeys();
+        // Background
+        this.add.image(width / 2, height / 2, 'game_bg').setDisplaySize(width, height);
+
+        // Player
+        this.player = this.physics.add.sprite(width / 2, height * 0.85, 'player')
+            .setDisplaySize(120, 120)
+            .setImmovable(true);
+        this.player.body.setSize(60, 60);
+        this.player.body.setOffset(30, 30);
+
+        // Group for falling objects
         this.objects = this.physics.add.group();
+        this.physics.add.overlap(this.player, this.objects, this.collectObject, null, this);
 
-        this.objectTimer = this.time.addEvent({
-            delay: 333,
+        // UI
+        this.createUI();
+
+        // Spawn Objects
+        this.time.addEvent({
+            delay: GAME_CONFIG.OBJECT_SPAWN_RATE,
+            loop: true,
             callback: this.spawnObject,
-            callbackScope: this,
-            loop: true
+            callbackScope: this
         });
 
-        this.hungerTimer = this.time.addEvent({
+        // Hunger Timer
+        this.time.addEvent({
             delay: 1000,
+            loop: true,
             callback: () => {
                 hunger = Math.max(0, hunger - 5);
-                this.hungerText.setText(`Hunger: ${hunger}%`);
+                this.updateUI();
 
-                if (hunger <= LOSING_HUNGER_THRESHOLD) {
+                if (hunger <= GAME_CONFIG.LOSING_HUNGER) {
                     this.scene.start('GameOverScene');
                 }
-            },
-            callbackScope: this,
-            loop: true
-        });
-
-        this.scoreText = this.add.text(10, 10, 'Score: 0', { fontSize: '24px', fill: '#fff' });
-        this.hungerText = this.add.text(10, 40, 'Hunger: 10%', { fontSize: '24px', fill: '#fff' });
-
-        // Swipe / Touch support
-        this.input.on('pointerdown', pointer => {
-                this.touchStartX = pointer.x;
-            });
-        
-        this.input.on('pointermove', (pointer) => {
-            if (pointer.isDown) {
-                this.player.x = Phaser.Math.Clamp(pointer.x, this.player.displayWidth / 2, this.scale.width - this.player.displayWidth / 2);
             }
         });
-        
-        this.input.on('pointerup', () => {
-            this.touchStartX = undefined;
+
+        // Swipe / Touch movement
+        this.input.on('pointermove', pointer => {
+            if (pointer.isDown) {
+                this.player.x = Phaser.Math.Clamp(
+                    pointer.x,
+                    this.player.displayWidth / 2,
+                    width - this.player.displayWidth / 2
+                );
+            }
         });
-     }
+
+        // Keyboard
+        this.cursors = this.input.keyboard.createCursorKeys();
+    }
+
+    createUI() {
+        this.ui = this.add.container(16, 16);
+        this.scoreText = this.add.text(0, 0, `Score: ${score}`, { fontSize: '20px', color: '#fff' });
+        this.hungerText = this.add.text(0, 28, `Hunger: ${hunger}%`, { fontSize: '20px', color: '#0f0' });
+        this.ui.add([this.scoreText, this.hungerText]);
+        this.ui.setScrollFactor(0);
+    }
+
+    updateUI() {
+        this.scoreText.setText(`Score: ${score}`);
+        this.hungerText.setText(`Hunger: ${hunger}%`);
+    }
 
     spawnObject() {
-        const objTypes = [
+        const types = [
             { key: 'object1', value: 1 },
             { key: 'object2', value: 10 },
             { key: 'object3', value: 15 },
@@ -101,52 +169,45 @@ class GameScene extends Phaser.Scene {
             { key: 'object7', value: -50 }
         ];
 
-        const objData = Phaser.Utils.Array.GetRandom(objTypes);
-        const x = Phaser.Math.Between(32, 768);
-        const obj = this.objects.create(x, -32, objData.key).setDisplaySize(64, 64);
-        obj.value = objData.value;
-        obj.setVelocityY(Phaser.Math.Between(100, 200));
+        const data = Phaser.Utils.Array.GetRandom(types);
+        const x = Phaser.Math.Between(32, this.scale.width - 32);
+        const obj = this.objects.create(x, -32, data.key).setDisplaySize(56, 56);
+        obj.value = data.value;
+        obj.setVelocityY(Phaser.Math.Between(120, 220));
+    }
+
+    collectObject(player, obj) {
+        score += obj.value;
+        hunger = Phaser.Math.Clamp(hunger + obj.value, 0, 100);
+        obj.destroy();
+        this.updateUI();
+
+        if (score >= GAME_CONFIG.WINNING_SCORE && hunger === 100) {
+            this.scene.start('VictoryScene');
+        }
+
+        if (hunger <= GAME_CONFIG.LOSING_HUNGER) {
+            this.scene.start('GameOverScene');
+        }
     }
 
     update() {
         if (this.cursors.left.isDown) {
-            this.moveLeft();
+            this.player.x = Math.max(this.player.displayWidth / 2, this.player.x - 10);
         } else if (this.cursors.right.isDown) {
-            this.moveRight();
+            this.player.x = Math.min(this.scale.width - this.player.displayWidth / 2, this.player.x + 10);
         }
 
+        // Remove objects off-screen
         this.objects.getChildren().forEach(obj => {
-            if (obj.y > 600) {
-                obj.destroy();
-            } else if (Phaser.Geom.Intersects.RectangleToRectangle(this.player.getBounds(), obj.getBounds())) {
-                score += obj.value;
-                hunger = Phaser.Math.Clamp(hunger + obj.value, 0, 100);
-                obj.destroy();
-
-                this.scoreText.setText(`Score: ${score}`);
-                this.hungerText.setText(`Hunger: ${hunger}%`);
-
-                if (score >= WINNING_SCORE && hunger === 100) {
-                    this.scene.start('VictoryScene');
-                }
-
-                if (hunger <= LOSING_HUNGER_THRESHOLD) {
-                    this.scene.start('GameOverScene');
-                }
-            }
+            if (obj.y > this.scale.height + 32) obj.destroy();
         });
-    }
-
-    moveLeft() {
-        this.player.x = Math.max(100, this.player.x - 10);
-    }
-
-    moveRight() {
-        this.player.x = Math.min(700, this.player.x + 10);
     }
 }
 
-// Victory Scene
+// ==========================
+// Victory Scene (Restart Added)
+// ==========================
 class VictoryScene extends Phaser.Scene {
     constructor() {
         super('VictoryScene');
@@ -158,59 +219,88 @@ class VictoryScene extends Phaser.Scene {
     }
 
     create() {
-        const victoryImages = ['victory1', 'victory2'];
-        const chosen = Phaser.Utils.Array.GetRandom(victoryImages);
-        this.add.image(400, 300, chosen).setDisplaySize(400, 400);
-        this.add.text(150, 50, 'You Fed Glutt!', { fontSize: '64px', fill: '#fff' });
+        const { width, height } = this.scale;
+        const key = Phaser.Utils.Array.GetRandom(['victory1', 'victory2']);
 
-        this.add.text(300, 550, 'Mint Collectible', { fontSize: '32px', fill: '#0f0', backgroundColor: '#000' })
-            .setInteractive()
-            .on('pointerdown', () => {
-                window.open('https://opensea.io/collection/glutts', '_blank');
-            });
+        this.add.image(width / 2, height / 2, key)
+            .setDisplaySize(width * 0.6, width * 0.6);
+
+        this.add.text(width / 2, height * 0.15, 'You Fed Glutt!', {
+            fontSize: 'clamp(32px, 7vw, 56px)',
+            color: '#fff'
+        }).setOrigin(0.5);
+
+        this.createButton(width / 2, height * 0.75, 'Play Again', () => this.scene.start('StartScene'));
+        this.createButton(width / 2, height * 0.85, 'Mint Collectible', () => {
+            window.open('https://opensea.io/collection/glutts', '_blank');
+        });
+    }
+
+    createButton(x, y, label, callback) {
+        const btn = this.add.text(x, y, label, {
+            fontSize: '24px',
+            color: '#fff',
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            padding: { x: 20, y: 12 },
+            align: 'center'
+        }).setOrigin(0.5).setInteractive();
+
+        btn.on('pointerdown', callback);
+        btn.on('pointerover', () => btn.setScale(1.05));
+        btn.on('pointerout', () => btn.setScale(1));
+        return btn;
     }
 }
 
+// ==========================
 // Game Over Scene
+// ==========================
 class GameOverScene extends Phaser.Scene {
     constructor() {
         super('GameOverScene');
     }
 
     create() {
-        this.add.text(250, 250, 'Game Over', { fontSize: '64px', fill: '#fff' });
-        this.add.text(200, 350, 'Press ENTER or Tap to Retry', { fontSize: '32px', fill: '#fff' });
+        const { width, height } = this.scale;
 
-        this.input.keyboard.on('keydown-ENTER', () => {
-            this.scene.start('StartScene');
-        });
+        this.add.text(width / 2, height * 0.4, 'Game Over', { fontSize: '64px', fill: '#fff' }).setOrigin(0.5);
+        this.add.text(width / 2, height * 0.55, 'Tap or Press ENTER to Retry', { fontSize: '28px', fill: '#fff' }).setOrigin(0.5);
 
-        this.input.on('pointerdown', () => {
-            this.scene.start('StartScene');
-        });
+        this.input.keyboard.on('keydown-ENTER', () => this.scene.start('StartScene'));
+        this.input.on('pointerdown', () => this.scene.start('StartScene'));
     }
 }
 
-// Config + Game
+// ==========================
+// Game Config (Mobile + iframe optimized)
+// ==========================
 const config = {
     type: Phaser.AUTO,
-    width: 800,
-    height: 600,
-    backgroundColor: '#000000',
+    scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+        width: 390,  // mobile ratio
+        height: 844
+    },
+    parent: 'game-container',
+    backgroundColor: '#000',
     physics: {
         default: 'arcade',
-        arcade: {
-            gravity: { y: 0 },
-            debug: false
-        }
+        arcade: { gravity: { y: 0 }, debug: false }
     },
     scene: [StartScene, GameScene, VictoryScene, GameOverScene]
 };
 
+// ==========================
+// Start Game
+// ==========================
 const game = new Phaser.Game(config);
 
-// Shared variables
-let score = 0;
-let hunger = 50;
-const WINNING_SCORE = 500;
-const LOSING_HUNGER_THRESHOLD = 0;
+// ==========================
+// CSS (iframe & animation_url friendly)
+// ==========================
+// Add to your HTML:
+// <style>
+// html, body { margin:0; padding:0; background:#000; overflow:hidden; }
+// canvas { touch-action:none; }
+// </style>
