@@ -12,7 +12,7 @@ const GAME_CONFIG = {
 };
 
 // ==========================
-// Game Scene (Hook + Rope Sway + Sparks)
+// Game Scene (Hook + Rope Sway)
 // ==========================
 class GameScene extends Phaser.Scene {
     constructor() {
@@ -20,14 +20,11 @@ class GameScene extends Phaser.Scene {
     }
 
     preload() {
-        const { width, height } = this.scale;
-
         // Core assets
         this.load.image('game_bg', 'assets/backgrounds/default_bg.png');
         this.load.image('player', 'assets/player/default_player.png');
-        this.load.image('spark', 'assets/particles/spark.png');
 
-        // Rope segment for GPU-accelerated rope
+        // Rope segment
         this.load.image('rope_segment', 'assets/objects/rope_segment.png');
 
         // Falling objects
@@ -37,65 +34,37 @@ class GameScene extends Phaser.Scene {
     }
 
     create() {
+        const { width, height } = this.scale;
         console.log('GameScene started');
 
         score = 0;
         hunger = GAME_CONFIG.START_HUNGER;
-        const { width, height } = this.scale;
 
-        // Background
-        this.add.image(width / 2, height / 2, 'game_bg')
-            .setOrigin(0.5)
-            .setDisplaySize(width, height)
-            .setDepth(0);
+        // Background (guaranteed to show)
+        this.add.image(width / 2, height / 2, 'game_bg').setDisplaySize(width, height);
 
         // Player
         this.player = this.physics.add.sprite(width / 2, height * 0.85, 'player')
             .setDisplaySize(120, 120)
             .setImmovable(true);
         this.player.body.setSize(60, 60).setOffset(30, 30);
-        this.player.setDepth(2);
 
         // Falling objects
         this.objects = this.physics.add.group();
         this.physics.add.overlap(this.player, this.objects, this.collectObject, null, this);
 
-        // Particles for collecting objects
-        this.particles = this.add.particles('spark');
-        this.collectEmitter = this.particles.createEmitter({
-            speed: { min: -100, max: 100 },
-            scale: { start: 0.5, end: 0 },
-            alpha: { start: 1, end: 0 },
-            lifespan: 400,
-            quantity: 8,
-            on: false
-        });
-
-        // GPU rope system
+        // Hook system
         this.hookActive = false;
         this.hookObject = null;
         this.hookRetracting = false;
         this.hookSpawnX = null;
 
-        // Rope as tileSprite (GPU-accelerated)
+        // Rope as tileSprite
         this.rope = this.add.tileSprite(0, 0, 4, 1, 'rope_segment');
         this.rope.setOrigin(0.5, 0);
-        this.rope.displayHeight = 1; // directly set property
+        this.rope.displayHeight = 1;
         this.rope.setDepth(1);
         this.rope.setVisible(false);
-
-        // Spark trail along rope
-        this.ropeEmitter = this.add.particles('spark').createEmitter({
-            speed: 0,
-            scale: { start: 0.2, end: 0 },
-            alpha: { start: 0.7, end: 0 },
-            lifespan: 200,
-            quantity: 1,
-            frequency: 50,
-            follow: this.rope,
-            followOffset: { x: 0, y: 0 },
-        });
-        this.ropeEmitter.stop();
 
         // UI
         this.createUI();
@@ -122,7 +91,11 @@ class GameScene extends Phaser.Scene {
         // Swipe / touch movement
         this.input.on('pointermove', pointer => {
             if (pointer.isDown) {
-                this.player.x = Phaser.Math.Clamp(pointer.x, this.player.displayWidth / 2, width - this.player.displayWidth / 2);
+                this.player.x = Phaser.Math.Clamp(
+                    pointer.x,
+                    this.player.displayWidth / 2,
+                    width - this.player.displayWidth / 2
+                );
             }
         });
 
@@ -150,7 +123,7 @@ class GameScene extends Phaser.Scene {
             { key: 'object3', value: 15 },
             { key: 'object4', value: 5 },
             { key: 'object5', value: 5 },
-            { key: 'object6', value: 5, isHook: true }, // claw/hook object
+            { key: 'object6', value: 5, isHook: true },
             { key: 'object7', value: -50 }
         ];
 
@@ -161,7 +134,6 @@ class GameScene extends Phaser.Scene {
         obj.setVelocityY(Phaser.Math.Between(120, 220));
         obj.isHook = data.isHook || false;
 
-        // Initialize hook if spawned
         if (obj.isHook && !this.hookActive) {
             this.hookActive = true;
             this.hookObject = obj;
@@ -170,16 +142,13 @@ class GameScene extends Phaser.Scene {
             this.rope.visible = true;
             this.rope.displayHeight = 1;
             this.rope.x = x;
-            this.ropeEmitter.start();
         }
     }
 
     collectObject(player, obj) {
-        if (obj.isHook) return; // hook handled separately
+        if (obj.isHook) return;
         score += obj.value;
         hunger = Phaser.Math.Clamp(hunger + obj.value, 0, 100);
-
-        this.collectEmitter.explode(12, obj.x, obj.y);
         obj.destroy();
         this.updateUI();
 
@@ -201,15 +170,15 @@ class GameScene extends Phaser.Scene {
         if (this.hookActive && this.hookObject) {
             const hook = this.hookObject;
 
-            // Soft sway animation
-            const sway = Math.sin(this.time.now * 0.005) * 10; // sway amplitude 10px
+            // Soft sway
+            const sway = Math.sin(this.time.now * 0.005) * 10;
             this.rope.x = this.hookSpawnX + sway;
             this.rope.displayHeight = Math.max(1, hook.y);
 
             // Retract when player collides
             if (!this.hookRetracting && Phaser.Geom.Intersects.RectangleToRectangle(this.player.getBounds(), hook.getBounds())) {
                 this.hookRetracting = true;
-                hook.setVelocityY(-200); // retract speed
+                hook.setVelocityY(-200);
             }
 
             // Player attached while retracting
@@ -217,18 +186,16 @@ class GameScene extends Phaser.Scene {
                 this.player.y = hook.y + 60;
                 if (hook.y <= 0) {
                     this.rope.visible = false;
-                    this.ropeEmitter.stop();
                     this.scene.start('GameOverScene');
                 }
             }
 
-            // Hook falls off screen without player
+            // Hook falls off screen
             if (hook.y > this.scale.height + 32 && !this.hookRetracting) {
                 hook.destroy();
                 this.hookActive = false;
                 this.hookObject = null;
                 this.rope.visible = false;
-                this.ropeEmitter.stop();
             }
         }
 
