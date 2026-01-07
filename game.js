@@ -1,4 +1,17 @@
 // ==========================
+// Global Game State
+// ==========================
+let score = 0;
+let hunger = 100;
+
+const GAME_CONFIG = {
+    START_HUNGER: 100,
+    LOSING_HUNGER: 0,
+    OBJECT_SPAWN_RATE: 900,
+    WINNING_SCORE: 100
+};
+
+// ==========================
 // Game Scene (Hook + Rope Sway + Sparks)
 // ==========================
 class GameScene extends Phaser.Scene {
@@ -24,6 +37,8 @@ class GameScene extends Phaser.Scene {
     }
 
     create() {
+
+        console.log('GameScene started');
         score = 0;
         hunger = GAME_CONFIG.START_HUNGER;
         const { width, height } = this.scale;
@@ -215,3 +230,25 @@ class GameScene extends Phaser.Scene {
         this.updateUI();
     }
 }
+// ==========================
+// Phaser Game Config
+// ==========================
+const config = {
+    type: Phaser.AUTO,
+    width: 390,
+    height: 844,
+    backgroundColor: '#000000',
+    physics: {
+        default: 'arcade',
+        arcade: {
+            gravity: { y: 0 },
+            debug: false
+        }
+    },
+    scene: [GameScene]
+};
+
+// ==========================
+// Start Game
+// ==========================
+new Phaser.Game(config);
