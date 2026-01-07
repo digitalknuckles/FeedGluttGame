@@ -14,63 +14,6 @@ let hunger = GAME_CONFIG.START_HUNGER;
 // ==========================
 // Start Scene (Modern UI)
 // ==========================
-class StartScene extends Phaser.Scene {
-    constructor() {
-        super('StartScene');
-    }
-
-    preload() {
-        this.load.image('start_bg', 'assets/backgrounds/start_menu_bg.png');
-    }
-
-    create() {
-        const { width, height } = this.scale;
-
-        // Background
-        this.add.image(width / 2, height / 2, 'start_bg')
-            .setDisplaySize(width, height);
-
-        // Animated Title
-        const title = this.add.text(width / 2, height * 0.25, 'Feed GLUTT!', {
-            fontFamily: 'Arial Black',
-            fontSize: 'clamp(36px, 8vw, 64px)',
-            color: '#ffffff'
-        }).setOrigin(0.5);
-
-        this.tweens.add({
-            targets: title,
-            y: title.y + 10,
-            duration: 800,
-            yoyo: true,
-            repeat: -1
-        });
-
-        // Start Button
-        this.createButton(width / 2, height * 0.6, 'Tap to Start', () => this.scene.start('GameScene'));
-    }
-
-    createButton(x, y, label, callback) {
-        const btn = this.add.text(x, y, label, {
-            fontSize: '28px',
-            color: '#fff',
-            backgroundColor: 'rgba(0,0,0,0.6)',
-            padding: { x: 24, y: 14 },
-            align: 'center'
-        })
-        .setOrigin(0.5)
-        .setInteractive({ useHandCursor: true });
-
-        btn.on('pointerdown', callback);
-        btn.on('pointerover', () => btn.setScale(1.05));
-        btn.on('pointerout', () => btn.setScale(1));
-
-        return btn;
-    }
-}
-
-// ==========================
-// Game Scene (Optimized Mobile UX)
-// ==========================
 class GameScene extends Phaser.Scene {
     constructor() {
         super('GameScene');
@@ -83,6 +26,9 @@ class GameScene extends Phaser.Scene {
         for (let i = 1; i <= 7; i++) {
             this.load.image(`object${i}`, `assets/objects/default_object${i}.png`);
         }
+
+        // Particle effect
+        this.load.image('spark', 'assets/particles/spark.png'); // small spark image
     }
 
     create() {
@@ -104,6 +50,19 @@ class GameScene extends Phaser.Scene {
         // Group for falling objects
         this.objects = this.physics.add.group();
         this.physics.add.overlap(this.player, this.objects, this.collectObject, null, this);
+
+        // Particles
+        this.particles = this.add.particles('spark');
+        this.collectEmitter = this.particles.createEmitter({
+            x: 0,
+            y: 0,
+            speed: { min: -100, max: 100 },
+            scale: { start: 0.5, end: 0 },
+            alpha: { start: 1, end: 0 },
+            lifespan: 400,
+            quantity: 8,
+            on: false
+        });
 
         // UI
         this.createUI();
@@ -146,14 +105,41 @@ class GameScene extends Phaser.Scene {
     }
 
     createUI() {
-        this.ui = this.add.container(16, 16);
-        this.scoreText = this.add.text(0, 0, `Score: ${score}`, { fontSize: '20px', color: '#fff' });
-        this.hungerText = this.add.text(0, 28, `Hunger: ${hunger}%`, { fontSize: '20px', color: '#0f0' });
-        this.ui.add([this.scoreText, this.hungerText]);
-        this.ui.setScrollFactor(0);
+        const { width } = this.scale;
+
+        // Score and Hunger progress bars
+        this.scoreBarBG = this.add.rectangle(20, 20, width - 40, 20, 0x222222).setOrigin(0, 0);
+        this.scoreBarFG = this.add.rectangle(20, 20, 0, 20, 0x00ffcc).setOrigin(0, 0);
+
+        this.hungerBarBG = this.add.rectangle(20, 50, width - 40, 20, 0x222222).setOrigin(0, 0);
+        this.hungerBarFG = this.add.rectangle(20, 50, (width - 40) * (hunger / 100), 20, 0x00ff00).setOrigin(0, 0);
+
+        // Optional text display
+        this.scoreText = this.add.text(20, 20, `Score: ${score}`, { fontSize: '18px', color: '#fff' }).setOrigin(0, 0);
+        this.hungerText = this.add.text(20, 50, `Hunger: ${hunger}%`, { fontSize: '18px', color: '#fff' }).setOrigin(0, 0);
     }
 
     updateUI() {
+        const { width } = this.scale;
+
+        // Smoothly tween score bar
+        const scoreWidth = Phaser.Math.Clamp((score / GAME_CONFIG.WINNING_SCORE) * (width - 40), 0, width - 40);
+        this.tweens.add({
+            targets: this.scoreBarFG,
+            width: scoreWidth,
+            duration: 200,
+            ease: 'Quad.easeOut'
+        });
+
+        // Smoothly tween hunger bar
+        const hungerWidth = Phaser.Math.Clamp((hunger / 100) * (width - 40), 0, width - 40);
+        this.tweens.add({
+            targets: this.hungerBarFG,
+            width: hungerWidth,
+            duration: 200,
+            ease: 'Quad.easeOut'
+        });
+
         this.scoreText.setText(`Score: ${score}`);
         this.hungerText.setText(`Hunger: ${hunger}%`);
     }
@@ -179,6 +165,10 @@ class GameScene extends Phaser.Scene {
     collectObject(player, obj) {
         score += obj.value;
         hunger = Phaser.Math.Clamp(hunger + obj.value, 0, 100);
+
+        // Particle effect at collection
+        this.collectEmitter.explode(12, obj.x, obj.y);
+
         obj.destroy();
         this.updateUI();
 
@@ -198,109 +188,9 @@ class GameScene extends Phaser.Scene {
             this.player.x = Math.min(this.scale.width - this.player.displayWidth / 2, this.player.x + 10);
         }
 
-        // Remove objects off-screen
+        // Remove off-screen objects
         this.objects.getChildren().forEach(obj => {
             if (obj.y > this.scale.height + 32) obj.destroy();
         });
     }
 }
-
-// ==========================
-// Victory Scene (Restart Added)
-// ==========================
-class VictoryScene extends Phaser.Scene {
-    constructor() {
-        super('VictoryScene');
-    }
-
-    preload() {
-        this.load.image('victory1', 'assets/Feed_Glutt/victory1.png');
-        this.load.image('victory2', 'assets/Feed_Glutt/victory2.png');
-    }
-
-    create() {
-        const { width, height } = this.scale;
-        const key = Phaser.Utils.Array.GetRandom(['victory1', 'victory2']);
-
-        this.add.image(width / 2, height / 2, key)
-            .setDisplaySize(width * 0.6, width * 0.6);
-
-        this.add.text(width / 2, height * 0.15, 'You Fed Glutt!', {
-            fontSize: 'clamp(32px, 7vw, 56px)',
-            color: '#fff'
-        }).setOrigin(0.5);
-
-        this.createButton(width / 2, height * 0.75, 'Play Again', () => this.scene.start('StartScene'));
-        this.createButton(width / 2, height * 0.85, 'Mint Collectible', () => {
-            window.open('https://opensea.io/collection/glutts', '_blank');
-        });
-    }
-
-    createButton(x, y, label, callback) {
-        const btn = this.add.text(x, y, label, {
-            fontSize: '24px',
-            color: '#fff',
-            backgroundColor: 'rgba(0,0,0,0.6)',
-            padding: { x: 20, y: 12 },
-            align: 'center'
-        }).setOrigin(0.5).setInteractive();
-
-        btn.on('pointerdown', callback);
-        btn.on('pointerover', () => btn.setScale(1.05));
-        btn.on('pointerout', () => btn.setScale(1));
-        return btn;
-    }
-}
-
-// ==========================
-// Game Over Scene
-// ==========================
-class GameOverScene extends Phaser.Scene {
-    constructor() {
-        super('GameOverScene');
-    }
-
-    create() {
-        const { width, height } = this.scale;
-
-        this.add.text(width / 2, height * 0.4, 'Game Over', { fontSize: '64px', fill: '#fff' }).setOrigin(0.5);
-        this.add.text(width / 2, height * 0.55, 'Tap or Press ENTER to Retry', { fontSize: '28px', fill: '#fff' }).setOrigin(0.5);
-
-        this.input.keyboard.on('keydown-ENTER', () => this.scene.start('StartScene'));
-        this.input.on('pointerdown', () => this.scene.start('StartScene'));
-    }
-}
-
-// ==========================
-// Game Config (Mobile + iframe optimized)
-// ==========================
-const config = {
-    type: Phaser.AUTO,
-    scale: {
-        mode: Phaser.Scale.FIT,
-        autoCenter: Phaser.Scale.CENTER_BOTH,
-        width: 390,  // mobile ratio
-        height: 844
-    },
-    parent: 'game-container',
-    backgroundColor: '#000',
-    physics: {
-        default: 'arcade',
-        arcade: { gravity: { y: 0 }, debug: false }
-    },
-    scene: [StartScene, GameScene, VictoryScene, GameOverScene]
-};
-
-// ==========================
-// Start Game
-// ==========================
-const game = new Phaser.Game(config);
-
-// ==========================
-// CSS (iframe & animation_url friendly)
-// ==========================
-// Add to your HTML:
-// <style>
-// html, body { margin:0; padding:0; background:#000; overflow:hidden; }
-// canvas { touch-action:none; }
-// </style>
