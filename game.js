@@ -12,7 +12,7 @@ const GAME_CONFIG = {
 // Debug Config
 // ==========================
 const DEBUG_CONFIG = {
-    PHYSICS: false
+    PHYSICS: true
 };
 
 let score = 0;
