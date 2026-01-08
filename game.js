@@ -75,6 +75,7 @@ class GameScene extends Phaser.Scene {
         this.load.image('player', 'assets/player/default_player.png');
         this.load.image('rope_segment', 'assets/objects/rope_segment.png');
         this.load.image('spark', 'assets/particles/spark.png');
+        this.load.image('objectWild', 'assets/objects/default_object.png');
 
         for (let i = 1; i <= 7; i++) {
             this.load.image(`object${i}`, `assets/objects/default_object${i}.png`);
@@ -238,40 +239,101 @@ class GameScene extends Phaser.Scene {
     // ==========================
     // Stack Logic
     // ==========================
-    addToStack(textureKey) {
-        if (this.stack.length >= this.maxStackHeight) {
-            this.scene.start('GameOverScene');
+addToStack(textureKey, obj = null) {
+    if (this.stack.length >= this.maxStackHeight) {
+        this.scene.start('GameOverScene');
+        return;
+    }
+
+    this.stack.push(textureKey);
+
+    const icon = this.add.image(
+        this.scale.width - 32,
+        this.stackBaseY - (this.stack.length - 1) * this.stackIconSize,
+        textureKey
+    ).setDisplaySize(this.stackIconSize, this.stackIconSize);
+
+    this.stackIcons.push(icon);
+
+    // === Wild card behavior ===
+    if (obj?.isWild) {
+        this.startWildCardEffect(icon);
+    }
+
+    this.checkStackMatches();
+}
+
+    startWildCardEffect(icon) {
+    if (this.wildCardCooldown) return;
+    this.wildCardCooldown = true;
+
+    let elapsed = 0;
+    const duration = 15000; // 15 seconds
+    const interval = () => Phaser.Math.Between(3000, 5000); // 3-5 sec
+
+    const timer = this.time.addEvent({
+        delay: interval(),
+        callback: () => {
+            elapsed += timer.delay;
+            if (!this.stackIcons.includes(icon)) {
+                // Wild card removed from stack, stop effect
+                timer.remove(false);
+                this.wildCardCooldown = false;
+                return;
+            }
+
+            // Find a random stack icon other than the wild card itself
+            const others = this.stackIcons.filter(i => i !== icon);
+            if (others.length > 0) {
+                const randomIndex = Phaser.Math.Between(0, others.length - 1);
+                others[randomIndex].destroy();
+                const idx = this.stackIcons.indexOf(others[randomIndex]);
+                this.stackIcons.splice(idx, 1);
+                this.stack.splice(idx, 1);
+                this.reflowStack();
+            }
+
+            // Stop after 15 seconds
+            if (elapsed >= duration) {
+                timer.remove(false);
+                this.wildCardCooldown = false;
+            } else {
+                timer.reset({ delay: interval(), repeat: 0 });
+            }
+        },
+        repeat: -1
+    });
+}
+
+checkStackMatches() {
+    let i = 0;
+    while (i < this.stack.length) {
+        let j = i + 1;
+        while (j < this.stack.length && this.stack[j] === this.stack[i]) j++;
+
+        const count = j - i;
+
+        // === Wild card clear all ===
+        if (this.stack[i] === 'objectWild' && count >= 3) {
+            this.stackIcons.forEach(icon => icon.destroy());
+            this.stack = [];
+            this.stackIcons = [];
             return;
         }
 
-        this.stack.push(textureKey);
-
-        const icon = this.add.image(
-            this.scale.width - 32,
-            this.stackBaseY - (this.stack.length - 1) * this.stackIconSize,
-            textureKey
-        ).setDisplaySize(this.stackIconSize, this.stackIconSize);
-
-        this.stackIcons.push(icon);
-        this.checkStackMatches();
-    }
-
-    checkStackMatches() {
-        let i = 0;
-        while (i < this.stack.length) {
-            let j = i + 1;
-            while (j < this.stack.length && this.stack[j] === this.stack[i]) j++;
-
-            if (j - i >= 3) {
-                for (let k = i; k < j; k++) this.stackIcons[k].destroy();
-                this.stack.splice(i, j - i);
-                this.stackIcons.splice(i, j - i);
-                this.reflowStack();
-                return;
+        if (count >= 3) {
+            for (let k = i; k < j; k++) {
+                this.stackIcons[k].destroy();
             }
-            i = j;
+            this.stack.splice(i, count);
+            this.stackIcons.splice(i, count);
+            this.reflowStack();
+            return;
         }
+
+        i = j;
     }
+}
 
     reflowStack() {
         this.stackIcons.forEach((icon, index) => {
@@ -296,6 +358,7 @@ class GameScene extends Phaser.Scene {
             { key: 'object5', value: 5 },
             { key: 'object6', value: 0, isHook: true },
             { key: 'object7', value: -50 }
+            { key: 'objectWild', value: 0, isWild: true }
         ];
 
         let data = Phaser.Utils.Array.GetRandom(types);
@@ -322,17 +385,23 @@ class GameScene extends Phaser.Scene {
         }
     }
 
-    collectObject(player, obj) {
-        if (obj.isHook) return;
+collectObject(player, obj) {
+    if (obj.isHook) return;
 
-        score += obj.value;
-        hunger = Phaser.Math.Clamp(hunger + obj.value, 0, 100);
-        this.stamina = Phaser.Math.Clamp(this.stamina + Math.max(5, obj.value), 0, this.maxStamina);
+    score += obj.value;
+    hunger = Phaser.Math.Clamp(hunger + obj.value, 0, 100);
 
-        this.addToStack(obj.texture.key);
-        obj.destroy();
-        this.updateUI();
-    }
+    // Food restores stamina
+    this.stamina = Phaser.Math.Clamp(
+        this.stamina + Math.max(5, obj.value),
+        0,
+        this.maxStamina
+    );
+
+    this.addToStack(obj.texture.key, obj); // pass obj to detect wild card
+    obj.destroy();
+    this.updateUI();
+}
 
     // ==========================
     // Escape
