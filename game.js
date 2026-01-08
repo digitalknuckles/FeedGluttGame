@@ -142,7 +142,7 @@ class GameScene extends Phaser.Scene {
     updateUI() {
         this.scoreText.setText(`Score: ${score}`);
         this.hungerText.setText(`Hunger: ${hunger}%`);
-        this.staminaBar.width = Phaser.Math.Clamp(120 * (this.stamina / this.maxStamina), 0, 120);
+        //this.staminaBar.width = Phaser.Math.Clamp(120 * (this.stamina / this.maxStamina), 0, 120);
     }
 
     // ==========================
