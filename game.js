@@ -86,7 +86,7 @@ class GameScene extends Phaser.Scene {
             .setDisplaySize(250, 250)
             .setImmovable(true)
             .setDepth(10);
-        this.player.body.setSize(60, 60).setOffset(250, 250);
+        this.player.body.setSize(100, 100).setOffset(250, 250);
 
         // Stamina
         this.stamina = 100;
