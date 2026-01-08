@@ -3,7 +3,7 @@
 // ==========================
 const GAME_CONFIG = {
     START_HUNGER: 100,
-    WINNING_SCORE: 200,
+    WINNING_SCORE: 300,
     LOSING_HUNGER: 0,
     OBJECT_SPAWN_RATE: 350
 };
