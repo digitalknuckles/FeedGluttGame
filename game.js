@@ -8,6 +8,8 @@ const GAME_CONFIG = {
     OBJECT_SPAWN_RATE: 350
 };
 
+// Debug
+/*
   physics: {
     default: 'arcade',
     arcade: {
@@ -15,7 +17,7 @@ const GAME_CONFIG = {
     }
   }
 };
-
+*/
 let score = 0;
 let hunger = GAME_CONFIG.START_HUNGER;
 
