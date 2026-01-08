@@ -494,7 +494,7 @@ class GameOverScene extends Phaser.Scene {
 // ==========================
 const config = {
     type: Phaser.AUTO,
-    scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width: 590, height: 844 },
+    scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width: 800, height: 800 },
     parent: 'game-container',
     physics: { default: 'arcade', arcade: { gravity: { y: 0 }, debug: false } },
     scene: [StartScene, GameScene, VictoryScene, GameOverScene]
