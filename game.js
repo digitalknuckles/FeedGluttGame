@@ -314,13 +314,23 @@ collectObject(player, obj) {
 }
 
 triggerCollisionEffect() {
-    if (this.isCollisionAnimating) return; // prevent overlapping triggers
+    if (this.isCollisionAnimating) this.time.removeAllEvents(); // cancel previous revert
     this.isCollisionAnimating = true;
 
+    // Raise depth so collision sprite is always in front
+    this.player.setDepth(DEPTH.OBJECTS + 1);
+
+    // Swap to collision sprite
     this.player.setTexture('collision_effect');
 
+    // Optional: scale or tweak offsets if collision sprite size differs
+    // this.player.setDisplaySize(275, 275);
+    // this.player.body.setSize(300, 150).setOffset(350, 450);
+
+    // After 0.5s, revert to default sprite
     this.time.delayedCall(500, () => {
-        this.player.setTexture('player'); // revert to default
+        this.player.setTexture('player'); 
+        this.player.setDepth(DEPTH.PLAYER); // restore depth
         this.isCollisionAnimating = false;
     });
 }
