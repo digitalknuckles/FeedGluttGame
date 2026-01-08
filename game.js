@@ -258,6 +258,8 @@ class GameScene extends Phaser.Scene {
         this.triggerCollisionEffect(); // normal collision effect
     }
 
+    
+    /*
 triggerCollisionEffect() {
     if (this.isCollisionAnimating) this.time.removeAllEvents(); // cancel previous revert
     this.isCollisionAnimating = true;
@@ -279,7 +281,7 @@ triggerCollisionEffect() {
         this.isCollisionAnimating = false;
     });
 }
-
+*/
     updateUI() {
         this.scoreText.setText(`Score: ${score}`);
         this.hungerText.setText(`Hunger: ${hunger}%`);
