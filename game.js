@@ -12,8 +12,7 @@ const GAME_CONFIG = {
 // Debug Config
 // ==========================
 const DEBUG_CONFIG = {
-    PHYSICS: false,   // toggle arcade debug
-    SHOW_FPS: false
+    PHYSICS: true 
 };
 
 let score = 0;
@@ -509,26 +508,26 @@ class GameOverScene extends Phaser.Scene {
 // ==========================
 const config = {
     type: Phaser.AUTO,
-    parent: 'game-container',
-
     scale: {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH,
         width: 800,
         height: 800
     },
-
+    parent: 'game-container',
     physics: {
         default: 'arcade',
         arcade: {
             gravity: { y: 0 },
-            debug: DEBUG_CONFIG.PHYSICS
+            debug: DEBUG_CONFIG.PHYSICS,   // ✅ THIS draws hitboxes
+            debugShowVelocity: false,
+            debugShowBody: true,
+            debugShowStaticBody: true
         }
     },
-
-    fps: DEBUG_CONFIG.SHOW_FPS ? { min: 30, target: 60, forceSetTimeOut: true } : undefined,
-
     scene: [StartScene, GameScene, VictoryScene, GameOverScene]
 };
+
+new Phaser.Game(config);
 
 new Phaser.Game(config);
