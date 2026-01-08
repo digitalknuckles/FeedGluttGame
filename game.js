@@ -321,14 +321,14 @@ class GameScene extends Phaser.Scene {
     // ==========================
     spawnObject() {
         const types = [
-            { key: 'object1', value: 1 },
-            { key: 'object2', value: 10 },
-            { key: 'object3', value: 15 },
-            { key: 'object4', value: 5 },
-            { key: 'object5', value: 5 },
+            { key: 'object1', value: 10 },
+            { key: 'object2', value: 20 },
+            { key: 'object3', value: 25 },
+            { key: 'object4', value: 15 },
+            { key: 'object5', value: 15 },
             { key: 'object6', value: 0, isHook: true },
             { key: 'object7', value: -50 },
-            { key: 'objectWild', value: 0, isWild: true }
+            { key: 'objectWild', value: 25, isWild: true }
         ];
 
         let data = Phaser.Utils.Array.GetRandom(types);
