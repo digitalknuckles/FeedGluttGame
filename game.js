@@ -12,7 +12,19 @@ const GAME_CONFIG = {
 // Debug Config
 // ==========================
 const DEBUG_CONFIG = {
-    PHYSICS: true 
+    PHYSICS: true
+};
+
+// ==========================
+// Render Depths
+// ==========================
+const DEPTH = {
+    BACKGROUND: 0,
+    PLAYER: 5,
+    OBJECTS: 10,   // ← falling objects ABOVE player
+    ROPE: 15,
+    UI: 100,
+    DEBUG: 999
 };
 
 let score = 0;
@@ -23,10 +35,17 @@ let hunger = GAME_CONFIG.START_HUNGER;
 // ==========================
 class StartScene extends Phaser.Scene {
     constructor() { super('StartScene'); }
-    preload() { this.load.image('start_bg', 'assets/backgrounds/start_menu_bg.png'); }
+
+    preload() {
+        this.load.image('start_bg', 'assets/backgrounds/start_menu_bg.png');
+    }
+
     create() {
         const { width, height } = this.scale;
-        this.add.image(width / 2, height / 2, 'start_bg').setDisplaySize(width, height);
+
+        this.add.image(width / 2, height / 2, 'start_bg')
+            .setDisplaySize(width, height)
+            .setDepth(DEPTH.BACKGROUND);
 
         const title = this.add.text(width / 2, height * 0.25, 'Feed GLUTT!', {
             fontFamily: 'Arial Black',
@@ -42,8 +61,11 @@ class StartScene extends Phaser.Scene {
             repeat: -1
         });
 
-        this.createButton(width / 2, height * 0.6, 'Tap to Start', () => { this.scene.start('GameScene'); });
+        this.createButton(width / 2, height * 0.6, 'Tap to Start', () => {
+            this.scene.start('GameScene');
+        });
     }
+
     createButton(x, y, label, callback) {
         const btn = this.add.text(x, y, label, {
             fontSize: '28px',
@@ -62,14 +84,6 @@ class StartScene extends Phaser.Scene {
 // Game Scene
 // ==========================
 class GameScene extends Phaser.Scene {
-    const DEPTH = {
-    BACKGROUND: 0,
-    OBJECTS: 5,
-    PLAYER: 10,
-    ROPE: 15,
-    UI: 100,
-    DEBUG: 999
-};
     constructor() { super('GameScene'); }
 
     preload() {
@@ -87,48 +101,36 @@ class GameScene extends Phaser.Scene {
     create() {
         score = 0;
         hunger = GAME_CONFIG.START_HUNGER;
+
         const { width, height } = this.scale;
+
+        // Background
+        this.add.image(width / 2, height / 2, 'game_bg')
+            .setDisplaySize(width, height)
+            .setDepth(DEPTH.BACKGROUND);
 
         // Player
         this.player = this.physics.add.sprite(width / 2, height * 0.85, 'player')
             .setDisplaySize(250, 250)
             .setImmovable(true)
             .setDepth(DEPTH.PLAYER);
-            //.setDepth(1);
+
         this.player.body.setSize(200, 150).setOffset(250, 350);
-
-        // Stamina
-        this.stamina = 100;
-        this.maxStamina = 100;
-
-        // Stack System
-        this.stack = [];
-        this.stackIcons = [];
-        this.stackIconSize = 32;
-        this.stackBaseY = height - 40;
-        this.maxStackHeight = Math.floor(height / this.stackIconSize);
-
-        // Background
-        this.add.image(width / 2, height / 2, 'game_bg').setDisplaySize(width, height);
 
         // Falling Objects
         this.objects = this.physics.add.group();
         this.physics.add.overlap(this.player, this.objects, this.collectObject, null, this);
 
-        // Hook State
-        this.hookActive = false;
-        this.hookCooldown = false;
-        this.hookObject = null;
-        this.hookedPlayer = false;
-
         // Rope
         this.rope = this.add.tileSprite(0, 0, 6, 1, 'rope_segment')
             .setOrigin(0.5, 0)
             .setVisible(false)
-            .setDepth(DEPTH.OBJECTS);
-        this.ropeEmitter.manager.setDepth(DEPTH.ROPE);
+            .setDepth(DEPTH.ROPE);
 
-        this.ropeEmitter = this.add.particles('spark').createEmitter({
+        const particles = this.add.particles('spark');
+        particles.setDepth(DEPTH.ROPE);
+
+        this.ropeEmitter = particles.createEmitter({
             speed: 0,
             scale: { start: 0.25, end: 0 },
             alpha: { start: 0.6, end: 0 },
@@ -138,28 +140,55 @@ class GameScene extends Phaser.Scene {
         });
         this.ropeEmitter.stop();
 
-        // Tension
+        // Hook State
+        this.hookActive = false;
+        this.hookCooldown = false;
+        this.hookObject = null;
+        this.hookedPlayer = false;
+
+        // Stamina / Tension
+        this.stamina = 100;
+        this.maxStamina = 100;
         this.tension = 0;
         this.lastPointerX = null;
         this.baseTensionThreshold = 100;
         this.escapeDifficulty = 1;
 
+        // Stack System
+        this.stack = [];
+        this.stackIcons = [];
+        this.stackIconSize = 32;
+        this.stackBaseY = height - 40;
+        this.maxStackHeight = Math.floor(height / this.stackIconSize);
+
         // UI
         this.createUI();
-        this.tensionBarBg = this.add.rectangle(16, 64, 120, 10, 0x222222).setOrigin(0, 0);
-        this.tensionBar = this.add.rectangle(16, 64, 0, 10, 0xff4444).setOrigin(0, 0);
         this.ui.setDepth(DEPTH.UI);
-        this.tensionBarBg.setDepth(DEPTH.UI);
-        this.tensionBar.setDepth(DEPTH.UI);
-        
+
+        this.tensionBarBg = this.add.rectangle(16, 64, 120, 10, 0x222222)
+            .setOrigin(0, 0)
+            .setDepth(DEPTH.UI);
+
+        this.tensionBar = this.add.rectangle(16, 64, 0, 10, 0xff4444)
+            .setOrigin(0, 0)
+            .setDepth(DEPTH.UI);
+
         // Timers
-        this.time.addEvent({ delay: GAME_CONFIG.OBJECT_SPAWN_RATE, loop: true, callback: this.spawnObject, callbackScope: this });
+        this.time.addEvent({
+            delay: GAME_CONFIG.OBJECT_SPAWN_RATE,
+            loop: true,
+            callback: this.spawnObject,
+            callbackScope: this
+        });
+
         this.time.addEvent({
             delay: 1000,
             loop: true,
             callback: () => {
                 hunger = Math.max(0, hunger - 5);
-                if (hunger <= GAME_CONFIG.LOSING_HUNGER) this.scene.start('GameOverScene');
+                if (hunger <= GAME_CONFIG.LOSING_HUNGER) {
+                    this.scene.start('GameOverScene');
+                }
                 this.updateUI();
             }
         });
@@ -167,21 +196,31 @@ class GameScene extends Phaser.Scene {
         // Input
         this.input.on('pointermove', pointer => {
             if (!pointer.isDown) return;
-            this.player.x = Phaser.Math.Clamp(pointer.x, this.player.displayWidth / 2, width - this.player.displayWidth / 2);
-            if (this.hookedPlayer && this.lastPointerX !== null) this.tension += Math.abs(pointer.x - this.lastPointerX) * 0.5;
+
+            this.player.x = Phaser.Math.Clamp(
+                pointer.x,
+                this.player.displayWidth / 2,
+                width - this.player.displayWidth / 2
+            );
+
+            if (this.hookedPlayer && this.lastPointerX !== null) {
+                this.tension += Math.abs(pointer.x - this.lastPointerX) * 0.5;
+            }
+
             this.lastPointerX = pointer.x;
         });
 
-    this.cursors = this.input.keyboard.createCursorKeys();
+        this.cursors = this.input.keyboard.createCursorKeys();
 
-    // ==========================
-    // Scene-level Debug Helpers
-    // ==========================
-    if (DEBUG_CONFIG.PHYSICS) {
-        this.physics.world.drawDebug = true;
-        this.physics.world.debugGraphic.setDepth(999);
+        // ==========================
+        // Physics Debug
+        // ==========================
+        if (DEBUG_CONFIG.PHYSICS) {
+            this.physics.world.drawDebug = true;
+            this.physics.world.debugGraphic.setDepth(DEPTH.DEBUG);
+        }
     }
-}
+
     // ==========================
     // UI
     // ==========================
@@ -191,7 +230,81 @@ class GameScene extends Phaser.Scene {
         this.hungerText = this.add.text(0, 22, `Hunger: ${hunger}%`, { fontSize: '18px', color: '#0f0' });
         this.staminaBg = this.add.rectangle(0, 46, 120, 8, 0x222222).setOrigin(0, 0.5);
         this.staminaBar = this.add.rectangle(0, 46, 120, 8, 0x00ffff).setOrigin(0, 0.5);
-        this.ui.add([this.scoreText, this.hungerText, this.staminaBg, this.staminaBar]);
+
+        this.ui.add([
+            this.scoreText,
+            this.hungerText,
+            this.staminaBg,
+            this.staminaBar
+        ]);
+    }
+
+    updateUI() {
+        this.scoreText.setText(`Score: ${score}`);
+        this.hungerText.setText(`Hunger: ${hunger}%`);
+        this.staminaBar.width = Phaser.Math.Clamp(
+            120 * (this.stamina / this.maxStamina),
+            0,
+            120
+        );
+    }
+
+    // ==========================
+    // Spawning & Collection
+    // ==========================
+    spawnObject() {
+        const types = [
+            { key: 'object1', value: 10 },
+            { key: 'object2', value: 10 },
+            { key: 'object3', value: 20 },
+            { key: 'object4', value: 20 },
+            { key: 'object5', value: 20 },
+            { key: 'object6', value: 0, isHook: true },
+            { key: 'object7', value: -50 },
+            { key: 'objectWild', value: 10, isWild: true }
+        ];
+
+        let data = Phaser.Utils.Array.GetRandom(types);
+        if (data.isHook && (this.hookActive || this.hookCooldown)) {
+            data = types.find(t => !t.isHook);
+        }
+
+        const obj = this.objects.create(
+            Phaser.Math.Between(32, this.scale.width - 32),
+            -32,
+            data.key
+        )
+            .setDisplaySize(56, 56)
+            .setDepth(DEPTH.OBJECTS)
+            .setVelocityY(Phaser.Math.Between(120, 220));
+
+        obj.value = data.value;
+        obj.isHook = data.isHook || false;
+        obj.isWild = data.isWild || false;
+
+        if (obj.isHook) {
+            this.hookActive = true;
+            this.hookObject = obj;
+            this.hookedPlayer = false;
+            this.rope.setVisible(true);
+            this.ropeEmitter.start();
+        }
+    }
+
+    collectObject(player, obj) {
+        if (obj.isHook) return;
+
+        score += obj.value;
+        hunger = Phaser.Math.Clamp(hunger + obj.value, 0, 100);
+        this.stamina = Phaser.Math.Clamp(
+            this.stamina + Math.max(5, obj.value),
+            0,
+            this.maxStamina
+        );
+
+        this.addToStack(obj.texture.key, obj);
+        obj.destroy();
+        this.updateUI();
     }
 
     updateUI() {
