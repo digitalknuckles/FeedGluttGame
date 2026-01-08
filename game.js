@@ -96,6 +96,9 @@ class GameScene extends Phaser.Scene {
 
         this.player.body.setSize(60, 60).setOffset(30, 30);
 
+        this.player.setDepth(5);
+        this.rope.setDepth(4);
+
         // ==========================
         // Stamina
         // ==========================
