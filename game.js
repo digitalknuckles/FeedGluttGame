@@ -313,26 +313,26 @@ collectObject(player, obj) {
     this.triggerCollisionEffect(); // collision with normal object
 }
 
-triggerCollisionEffect() {
-    if (this.isCollisionAnimating) this.time.removeAllEvents(); // cancel previous revert
-    this.isCollisionAnimating = true;
+collectObject(player, obj) {
+    if (obj.isHook) {
+        this.triggerCollisionEffect();
+        return;
+    }
 
-    // Raise depth so collision sprite is always in front
-    this.player.setDepth(DEPTH.OBJECTS + 1);
+    score += obj.value;
+    hunger = Phaser.Math.Clamp(hunger + obj.value, 0, 100);
 
-    // Swap to collision sprite
-    this.player.setTexture('collision_effect');
+    this.stamina = Phaser.Math.Clamp(
+        this.stamina + Math.max(5, obj.value),
+        0,
+        this.maxStamina
+    );
 
-    // Optional: scale or tweak offsets if collision sprite size differs
-    // this.player.setDisplaySize(275, 275);
-    // this.player.body.setSize(300, 150).setOffset(350, 450);
+    this.addToStack(obj.texture.key, obj);
+    obj.destroy();
+    this.updateUI();
 
-    // After 0.5s, revert to default sprite
-    this.time.delayedCall(500, () => {
-        this.player.setTexture('player'); 
-        this.player.setDepth(DEPTH.PLAYER); // restore depth
-        this.isCollisionAnimating = false;
-    });
+    this.triggerCollisionEffect();
 }
 
     updateUI() {
