@@ -137,7 +137,7 @@ class GameScene extends Phaser.Scene {
             delay: 1000,
             loop: true,
             callback: () => {
-                hunger = Math.max(0, hunger - 5);
+                hunger = Math.max(0, hunger - 1);
                 if (hunger <= GAME_CONFIG.LOSING_HUNGER) this.scene.start('GameOverScene');
                 this.updateUI();
             }
