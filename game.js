@@ -94,12 +94,9 @@ class GameScene extends Phaser.Scene {
         this.player = this.physics.add.sprite(width / 2, height * 0.85, 'player')
             .setDisplaySize(200, 200)
             .setImmovable(true)
-            .setDepth(10); // ← IMPORTANT
+            .setDepth(10);
 
         this.player.body.setSize(60, 60).setOffset(30, 30);
-
-        //this.player.setDepth(5);
-        //this.rope.setDepth(4);
 
         // ==========================
         // Stamina
@@ -239,101 +236,94 @@ class GameScene extends Phaser.Scene {
     // ==========================
     // Stack Logic
     // ==========================
-addToStack(textureKey, obj = null) {
-    if (this.stack.length >= this.maxStackHeight) {
-        this.scene.start('GameOverScene');
-        return;
+    addToStack(textureKey, obj = null) {
+        if (this.stack.length >= this.maxStackHeight) {
+            this.scene.start('GameOverScene');
+            return;
+        }
+
+        this.stack.push(textureKey);
+
+        const icon = this.add.image(
+            this.scale.width - 32,
+            this.stackBaseY - (this.stack.length - 1) * this.stackIconSize,
+            textureKey
+        ).setDisplaySize(this.stackIconSize, this.stackIconSize);
+
+        this.stackIcons.push(icon);
+
+        // Wild card behavior
+        if (obj?.isWild) this.startWildCardEffect(icon);
+
+        this.checkStackMatches();
     }
-
-    this.stack.push(textureKey);
-
-    const icon = this.add.image(
-        this.scale.width - 32,
-        this.stackBaseY - (this.stack.length - 1) * this.stackIconSize,
-        textureKey
-    ).setDisplaySize(this.stackIconSize, this.stackIconSize);
-
-    this.stackIcons.push(icon);
-
-    // === Wild card behavior ===
-    if (obj?.isWild) {
-        this.startWildCardEffect(icon);
-    }
-
-    this.checkStackMatches();
-}
 
     startWildCardEffect(icon) {
-    if (this.wildCardCooldown) return;
-    this.wildCardCooldown = true;
+        if (this.wildCardCooldown) return;
+        this.wildCardCooldown = true;
 
-    let elapsed = 0;
-    const duration = 15000; // 15 seconds
-    const interval = () => Phaser.Math.Between(3000, 5000); // 3-5 sec
+        let elapsed = 0;
+        const duration = 15000; // 15 sec
+        const interval = () => Phaser.Math.Between(3000, 5000);
 
-    const timer = this.time.addEvent({
-        delay: interval(),
-        callback: () => {
-            elapsed += timer.delay;
-            if (!this.stackIcons.includes(icon)) {
-                // Wild card removed from stack, stop effect
-                timer.remove(false);
-                this.wildCardCooldown = false;
+        const timer = this.time.addEvent({
+            delay: interval(),
+            callback: () => {
+                elapsed += timer.delay;
+                if (!this.stackIcons.includes(icon)) {
+                    timer.remove(false);
+                    this.wildCardCooldown = false;
+                    return;
+                }
+
+                const others = this.stackIcons.filter(i => i !== icon);
+                if (others.length > 0) {
+                    const randomIndex = Phaser.Math.Between(0, others.length - 1);
+                    others[randomIndex].destroy();
+                    const idx = this.stackIcons.indexOf(others[randomIndex]);
+                    this.stackIcons.splice(idx, 1);
+                    this.stack.splice(idx, 1);
+                    this.reflowStack();
+                }
+
+                if (elapsed >= duration) {
+                    timer.remove(false);
+                    this.wildCardCooldown = false;
+                } else {
+                    timer.reset({ delay: interval(), repeat: 0 });
+                }
+            },
+            repeat: -1
+        });
+    }
+
+    checkStackMatches() {
+        let i = 0;
+        while (i < this.stack.length) {
+            let j = i + 1;
+            while (j < this.stack.length && this.stack[j] === this.stack[i]) j++;
+
+            const count = j - i;
+
+            // Wild card clear all
+            if (this.stack[i] === 'objectWild' && count >= 3) {
+                this.stackIcons.forEach(icon => icon.destroy());
+                this.stack = [];
+                this.stackIcons = [];
                 return;
             }
 
-            // Find a random stack icon other than the wild card itself
-            const others = this.stackIcons.filter(i => i !== icon);
-            if (others.length > 0) {
-                const randomIndex = Phaser.Math.Between(0, others.length - 1);
-                others[randomIndex].destroy();
-                const idx = this.stackIcons.indexOf(others[randomIndex]);
-                this.stackIcons.splice(idx, 1);
-                this.stack.splice(idx, 1);
+            if (count >= 3) {
+                for (let k = i; k < j; k++) this.stackIcons[k].destroy();
+                this.stack.splice(i, count);
+                this.stackIcons.splice(i, count);
                 this.reflowStack();
+                return;
             }
 
-            // Stop after 15 seconds
-            if (elapsed >= duration) {
-                timer.remove(false);
-                this.wildCardCooldown = false;
-            } else {
-                timer.reset({ delay: interval(), repeat: 0 });
-            }
-        },
-        repeat: -1
-    });
-}
-
-checkStackMatches() {
-    let i = 0;
-    while (i < this.stack.length) {
-        let j = i + 1;
-        while (j < this.stack.length && this.stack[j] === this.stack[i]) j++;
-
-        const count = j - i;
-
-        // === Wild card clear all ===
-        if (this.stack[i] === 'objectWild' && count >= 3) {
-            this.stackIcons.forEach(icon => icon.destroy());
-            this.stack = [];
-            this.stackIcons = [];
-            return;
+            i = j;
         }
-
-        if (count >= 3) {
-            for (let k = i; k < j; k++) {
-                this.stackIcons[k].destroy();
-            }
-            this.stack.splice(i, count);
-            this.stackIcons.splice(i, count);
-            this.reflowStack();
-            return;
-        }
-
-        i = j;
     }
-}
 
     reflowStack() {
         this.stackIcons.forEach((icon, index) => {
@@ -357,7 +347,7 @@ checkStackMatches() {
             { key: 'object4', value: 5 },
             { key: 'object5', value: 5 },
             { key: 'object6', value: 0, isHook: true },
-            { key: 'object7', value: -50 }
+            { key: 'object7', value: -50 },
             { key: 'objectWild', value: 0, isWild: true }
         ];
 
@@ -374,6 +364,7 @@ checkStackMatches() {
 
         obj.value = data.value;
         obj.isHook = data.isHook || false;
+        obj.isWild = data.isWild || false;
         obj.setVelocityY(Phaser.Math.Between(120, 220));
 
         if (obj.isHook) {
@@ -385,23 +376,22 @@ checkStackMatches() {
         }
     }
 
-collectObject(player, obj) {
-    if (obj.isHook) return;
+    collectObject(player, obj) {
+        if (obj.isHook) return;
 
-    score += obj.value;
-    hunger = Phaser.Math.Clamp(hunger + obj.value, 0, 100);
+        score += obj.value;
+        hunger = Phaser.Math.Clamp(hunger + obj.value, 0, 100);
 
-    // Food restores stamina
-    this.stamina = Phaser.Math.Clamp(
-        this.stamina + Math.max(5, obj.value),
-        0,
-        this.maxStamina
-    );
+        this.stamina = Phaser.Math.Clamp(
+            this.stamina + Math.max(5, obj.value),
+            0,
+            this.maxStamina
+        );
 
-    this.addToStack(obj.texture.key, obj); // pass obj to detect wild card
-    obj.destroy();
-    this.updateUI();
-}
+        this.addToStack(obj.texture.key, obj);
+        obj.destroy();
+        this.updateUI();
+    }
 
     // ==========================
     // Escape
@@ -478,9 +468,7 @@ collectObject(player, obj) {
                 this.breakFree();
             }
 
-            if (hook.y <= 0) {
-                this.scene.start('GameOverScene');
-            }
+            if (hook.y <= 0) this.scene.start('GameOverScene');
         }
 
         if (hook.y > this.scale.height + 32 && !this.hookedPlayer) {
