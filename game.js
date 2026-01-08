@@ -3,7 +3,7 @@
 // ==========================
 const GAME_CONFIG = {
     START_HUNGER: 100,
-    WINNING_SCORE: 300,
+    WINNING_SCORE: 400,
     LOSING_HUNGER: 0,
     OBJECT_SPAWN_RATE: 350
 };
@@ -321,11 +321,11 @@ class GameScene extends Phaser.Scene {
     // ==========================
     spawnObject() {
         const types = [
-            { key: 'object1', value: 5 },
+            { key: 'object1', value: 10 },
             { key: 'object2', value: 10 },
-            { key: 'object3', value: 15 },
-            { key: 'object4', value: 15 },
-            { key: 'object5', value: 15 },
+            { key: 'object3', value: 20 },
+            { key: 'object4', value: 20 },
+            { key: 'object5', value: 20 },
             { key: 'object6', value: 0, isHook: true },
             { key: 'object7', value: -50 },
             { key: 'objectWild', value: 10, isWild: true }
