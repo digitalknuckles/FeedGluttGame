@@ -76,6 +76,56 @@ class GameScene extends Phaser.Scene {
         super('GameScene');
     }
 
+addToStack(textureKey) {
+    if (this.stack.length >= this.maxStackHeight) {
+        this.scene.start('GameOverScene');
+        return;
+    }
+
+    this.stack.push(textureKey);
+
+    const icon = this.add.image(
+        this.scale.width - 32,
+        this.stackBaseY - (this.stack.length - 1) * this.stackIconSize,
+        textureKey
+    ).setDisplaySize(this.stackIconSize, this.stackIconSize);
+
+    this.stackIcons.push(icon);
+    this.checkStackMatches();
+}
+
+checkStackMatches() {
+    let i = 0;
+    while (i < this.stack.length) {
+        let j = i + 1;
+        while (j < this.stack.length && this.stack[j] === this.stack[i]) j++;
+
+        if (j - i >= 3) {
+            for (let k = i; k < j; k++) {
+                this.stackIcons[k].destroy();
+            }
+
+            this.stack.splice(i, j - i);
+            this.stackIcons.splice(i, j - i);
+
+            this.reflowStack();
+            return;
+        }
+        i = j;
+    }
+}
+
+reflowStack() {
+    this.stackIcons.forEach((icon, index) => {
+        this.tweens.add({
+            targets: icon,
+            y: this.stackBaseY - index * this.stackIconSize,
+            duration: 200,
+            ease: 'Back.Out'
+        });
+    });
+}
+    
     preload() {
         this.load.image('game_bg', 'assets/backgrounds/default_bg.png');
         this.load.image('player', 'assets/player/default_player.png');
@@ -91,7 +141,21 @@ class GameScene extends Phaser.Scene {
         score = 0;
         hunger = GAME_CONFIG.START_HUNGER;
         const { width, height } = this.scale;
-
+        // ==========================
+        // Stamina
+        // ==========================
+        this.stamina = 100;
+        this.maxStamina = 100;
+        
+        // ==========================
+        // Stack System
+        // ==========================
+        this.stack = [];
+        this.stackIcons = [];
+        this.stackIconSize = 32;
+        this.stackBaseY = this.scale.height - 40;
+        this.maxStackHeight = Math.floor(this.scale.height / this.stackIconSize);
+        
         // Background
         this.add.image(width / 2, height / 2, 'game_bg').setDisplaySize(width, height);
 
@@ -202,18 +266,31 @@ class GameScene extends Phaser.Scene {
     // ==========================
     // UI
     // ==========================
-    createUI() {
-        this.ui = this.add.container(16, 16);
-        this.scoreText = this.add.text(0, 0, `Score: ${score}`, { fontSize: '20px', color: '#fff' });
-        this.hungerText = this.add.text(0, 28, `Hunger: ${hunger}%`, { fontSize: '20px', color: '#0f0' });
-        this.ui.add([this.scoreText, this.hungerText]);
-        this.ui.setScrollFactor(0);
-    }
+createUI() {
+    this.ui = this.add.container(16, 16);
 
-    updateUI() {
-        this.scoreText.setText(`Score: ${score}`);
-        this.hungerText.setText(`Hunger: ${hunger}%`);
-    }
+    this.scoreText = this.add.text(0, 0, `Score: ${score}`, { fontSize: '18px', color: '#fff' });
+    this.hungerText = this.add.text(0, 22, `Hunger: ${hunger}%`, { fontSize: '18px', color: '#0f0' });
+
+    // Stamina bar
+    this.staminaBg = this.add.rectangle(0, 46, 120, 8, 0x222222).setOrigin(0, 0.5);
+    this.staminaBar = this.add.rectangle(0, 46, 120, 8, 0x00ffff).setOrigin(0, 0.5);
+
+    this.ui.add([
+        this.scoreText,
+        this.hungerText,
+        this.staminaBg,
+        this.staminaBar
+    ]);
+
+    this.ui.setScrollFactor(0);
+}
+
+updateUI() {
+    this.scoreText.setText(`Score: ${score}`);
+    this.hungerText.setText(`Hunger: ${hunger}%`);
+    this.staminaBar.width = 120 * (this.stamina / this.maxStamina);
+}
 
     // ==========================
     // Spawning
@@ -252,14 +329,23 @@ class GameScene extends Phaser.Scene {
         }
     }
 
-    collectObject(player, obj) {
-        if (obj.isHook) return;
+collectObject(player, obj) {
+    if (obj.isHook) return;
 
-        score += obj.value;
-        hunger = Phaser.Math.Clamp(hunger + obj.value, 0, 100);
-        obj.destroy();
-        this.updateUI();
-    }
+    score += obj.value;
+    hunger = Phaser.Math.Clamp(hunger + obj.value, 0, 100);
+
+    // Food restores stamina
+    this.stamina = Phaser.Math.Clamp(
+        this.stamina + Math.max(5, obj.value),
+        0,
+        this.maxStamina
+    );
+
+    this.addToStack(obj.texture.key);
+    obj.destroy();
+    this.updateUI();
+}
 
     // ==========================
     // Escape
@@ -324,23 +410,45 @@ class GameScene extends Phaser.Scene {
             }
 
             // Retracting
-            if (this.hookedPlayer) {
-                hook.x = this.player.x;
-                this.player.y = hook.y + 60;
+            // Rope stretch under tension
+            this.rope.height = hook.y + (this.tension * 0.2);
+            
+            // Clamp hook to player X
+            hook.x = this.player.x;
+            this.player.y = hook.y + 60;
+            
+            // Passive tension decay
+            this.tension = Math.max(0, this.tension - 0.4);
+            
+            // Stamina drain while struggling
+            this.stamina = Math.max(0, this.stamina - 0.08 * this.escapeDifficulty);
+            
+            // Threshold scaling
+            const threshold = this.baseTensionThreshold * this.escapeDifficulty;
+            
+            // Update tension bar
+            this.tensionBar.width = Phaser.Math.Clamp(
+                (this.tension / threshold) * 120,
+                0,
+                120
+            );
+            
+            // Near-escape feedback
+            if (this.tension > threshold * 0.75) {
+                this.cameras.main.shake(60, 0.003);
+                this.player.x += Phaser.Math.Between(-1, 1);
+            }
+            
+            // Escape success
+            if (this.tension >= threshold && this.stamina > 0) {
+                this.breakFree();
+            }
+            
+            // Fail = game over
+            if (hook.y <= 0) {
+                this.scene.start('GameOverScene');
+            }
 
-                // Tension decay
-                this.tension = Math.max(0, this.tension - 0.6);
-
-                const threshold = this.baseTensionThreshold * this.escapeDifficulty;
-                this.tensionBar.width = Phaser.Math.Clamp(
-                    (this.tension / threshold) * 120,
-                    0,
-                    120
-                );
-
-                if (this.tension >= threshold) {
-                    this.breakFree();
-                }
 
                 // Screen shake near escape
                 if (this.tension > threshold * 0.75) {
