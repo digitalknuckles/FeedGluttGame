@@ -2,7 +2,7 @@
 // Shared Constants
 // ==========================
 const GAME_CONFIG = {
-    START_HUNGER: 50,
+    START_HUNGER: 100,
     WINNING_SCORE: 500,
     LOSING_HUNGER: 0,
     OBJECT_SPAWN_RATE: 350
