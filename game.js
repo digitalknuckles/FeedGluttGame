@@ -92,6 +92,7 @@ class GameScene extends Phaser.Scene {
         this.load.image('rope_segment', 'assets/objects/rope_segment.png');
         this.load.image('spark', 'assets/particles/spark.png');
         this.load.image('objectWild', 'assets/objects/default_object.png');
+        this.load.image('collision_effect', 'assets/player/collision_effect.png');
 
         for (let i = 1; i <= 7; i++) {
             this.load.image(`object${i}`, `assets/objects/default_object${i}.png`);
@@ -291,17 +292,39 @@ class GameScene extends Phaser.Scene {
         }
     }
 
-    collectObject(player, obj) {
-        if (obj.isHook) return;
+collectObject(player, obj) {
+    if (obj.isHook) {
+        this.triggerCollisionEffect();  // hook collision
+        return;
+    }
 
-        score += obj.value;
-        hunger = Phaser.Math.Clamp(hunger + obj.value, 0, 100);
-        this.stamina = Phaser.Math.Clamp(
-            this.stamina + Math.max(5, obj.value),
-            0,
-            this.maxStamina
-        );
+    score += obj.value;
+    hunger = Phaser.Math.Clamp(hunger + obj.value, 0, 100);
+    this.stamina = Phaser.Math.Clamp(
+        this.stamina + Math.max(5, obj.value),
+        0,
+        this.maxStamina
+    );
 
+    this.addToStack(obj.texture.key, obj);
+    obj.destroy();
+    this.updateUI();
+
+    this.triggerCollisionEffect(); // collision with normal object
+}
+    
+triggerCollisionEffect() {
+    if (this.isCollisionAnimating) return; // prevent overlapping triggers
+    this.isCollisionAnimating = true;
+
+    this.player.setTexture('collision_effect');
+
+    this.time.delayedCall(500, () => {
+        this.player.setTexture('player'); // revert to default
+        this.isCollisionAnimating = false;
+    });
+}
+    
         this.addToStack(obj.texture.key, obj);
         obj.destroy();
         this.updateUI();
