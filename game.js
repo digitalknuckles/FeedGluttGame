@@ -62,6 +62,14 @@ class StartScene extends Phaser.Scene {
 // Game Scene
 // ==========================
 class GameScene extends Phaser.Scene {
+    const DEPTH = {
+    BACKGROUND: 0,
+    OBJECTS: 5,
+    PLAYER: 10,
+    ROPE: 15,
+    UI: 100,
+    DEBUG: 999
+};
     constructor() { super('GameScene'); }
 
     preload() {
@@ -85,7 +93,8 @@ class GameScene extends Phaser.Scene {
         this.player = this.physics.add.sprite(width / 2, height * 0.85, 'player')
             .setDisplaySize(250, 250)
             .setImmovable(true)
-            .setDepth(1);
+            .setDepth(DEPTH.PLAYER);
+            //.setDepth(1);
         this.player.body.setSize(200, 150).setOffset(250, 350);
 
         // Stamina
@@ -115,7 +124,9 @@ class GameScene extends Phaser.Scene {
         // Rope
         this.rope = this.add.tileSprite(0, 0, 6, 1, 'rope_segment')
             .setOrigin(0.5, 0)
-            .setVisible(false);
+            .setVisible(false)
+            .setDepth(DEPTH.OBJECTS);
+        this.ropeEmitter.manager.setDepth(DEPTH.ROPE);
 
         this.ropeEmitter = this.add.particles('spark').createEmitter({
             speed: 0,
@@ -137,7 +148,10 @@ class GameScene extends Phaser.Scene {
         this.createUI();
         this.tensionBarBg = this.add.rectangle(16, 64, 120, 10, 0x222222).setOrigin(0, 0);
         this.tensionBar = this.add.rectangle(16, 64, 0, 10, 0xff4444).setOrigin(0, 0);
-
+        this.ui.setDepth(DEPTH.UI);
+        this.tensionBarBg.setDepth(DEPTH.UI);
+        this.tensionBar.setDepth(DEPTH.UI);
+        
         // Timers
         this.time.addEvent({ delay: GAME_CONFIG.OBJECT_SPAWN_RATE, loop: true, callback: this.spawnObject, callbackScope: this });
         this.time.addEvent({
@@ -352,7 +366,8 @@ class GameScene extends Phaser.Scene {
             Phaser.Math.Between(32, this.scale.width - 32),
             -32,
             data.key
-        ).setDisplaySize(56, 56);
+        ).setDisplaySize(56, 56)
+        .setDepth(DEPTH.OBJECTS); 
 
         obj.value = data.value;
         obj.isHook = data.isHook || false;
@@ -523,11 +538,10 @@ const config = {
             debugShowVelocity: false,
             debugShowBody: true,
             debugShowStaticBody: true
+            
         }
     },
     scene: [StartScene, GameScene, VictoryScene, GameOverScene]
 };
-
-new Phaser.Game(config);
 
 new Phaser.Game(config);
