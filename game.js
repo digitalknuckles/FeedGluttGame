@@ -8,16 +8,14 @@ const GAME_CONFIG = {
     OBJECT_SPAWN_RATE: 350
 };
 
-// Debug
-/*
-  physics: {
-    default: 'arcade',
-    arcade: {
-      debug: true
-    }
-  }
+// ==========================
+// Debug Config
+// ==========================
+const DEBUG_CONFIG = {
+    PHYSICS: false,   // toggle arcade debug
+    SHOW_FPS: false
 };
-*/
+
 let score = 0;
 let hunger = GAME_CONFIG.START_HUNGER;
 
@@ -161,9 +159,16 @@ class GameScene extends Phaser.Scene {
             this.lastPointerX = pointer.x;
         });
 
-        this.cursors = this.input.keyboard.createCursorKeys();
-    }
+    this.cursors = this.input.keyboard.createCursorKeys();
 
+    // ==========================
+    // Scene-level Debug Helpers
+    // ==========================
+    if (DEBUG_CONFIG.PHYSICS) {
+        this.physics.world.drawDebug = true;
+        this.physics.world.debugGraphic.setDepth(999);
+    }
+}
     // ==========================
     // UI
     // ==========================
@@ -504,9 +509,25 @@ class GameOverScene extends Phaser.Scene {
 // ==========================
 const config = {
     type: Phaser.AUTO,
-    scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width: 800, height: 800 },
     parent: 'game-container',
-    physics: { default: 'arcade', arcade: { gravity: { y: 0 }, debug: false } },
+
+    scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+        width: 800,
+        height: 800
+    },
+
+    physics: {
+        default: 'arcade',
+        arcade: {
+            gravity: { y: 0 },
+            debug: DEBUG_CONFIG.PHYSICS
+        }
+    },
+
+    fps: DEBUG_CONFIG.SHOW_FPS ? { min: 30, target: 60, forceSetTimeOut: true } : undefined,
+
     scene: [StartScene, GameScene, VictoryScene, GameOverScene]
 };
 
