@@ -92,12 +92,13 @@ class GameScene extends Phaser.Scene {
         // ==========================
         this.player = this.physics.add.sprite(width / 2, height * 0.85, 'player')
             .setDisplaySize(200, 200)
-            .setImmovable(true);
+            .setImmovable(true)
+            .setDepth(10); // ← IMPORTANT
 
         this.player.body.setSize(60, 60).setOffset(30, 30);
 
-        this.player.setDepth(5);
-        this.rope.setDepth(4);
+        //this.player.setDepth(5);
+        //this.rope.setDepth(4);
 
         // ==========================
         // Stamina
