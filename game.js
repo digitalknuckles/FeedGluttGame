@@ -69,7 +69,7 @@ class StartScene extends Phaser.Scene {
 }
 
 // ==========================
-// Game Scene (Hook + Rope + Particles)
+// Game Scene (Hook + Rope + Tension)
 // ==========================
 class GameScene extends Phaser.Scene {
     constructor() {
@@ -79,8 +79,6 @@ class GameScene extends Phaser.Scene {
     preload() {
         this.load.image('game_bg', 'assets/backgrounds/default_bg.png');
         this.load.image('player', 'assets/player/default_player.png');
-
-        // Rope and spark particles
         this.load.image('rope_segment', 'assets/objects/rope_segment.png');
         this.load.image('spark', 'assets/particles/spark.png');
 
@@ -101,39 +99,64 @@ class GameScene extends Phaser.Scene {
         this.player = this.physics.add.sprite(width / 2, height * 0.85, 'player')
             .setDisplaySize(120, 120)
             .setImmovable(true);
-        this.player.body.setSize(60, 60);
-        this.player.body.setOffset(30, 30);
+        this.player.body.setSize(60, 60).setOffset(30, 30);
 
-        // Objects
+        // Falling objects
         this.objects = this.physics.add.group();
         this.physics.add.overlap(this.player, this.objects, this.collectObject, null, this);
 
-        // Rope & hook setup
+        // ==========================
+        // Hook / Rope State
+        // ==========================
         this.hookActive = false;
-        this.hookSpawned = false;
+        this.hookCooldown = false;
         this.hookObject = null;
-        this.hookSpawnX = 0;
         this.hookRetracting = false;
+        this.hookedPlayer = false;
 
-        this.rope = this.add.tileSprite(0, 0, 4, 1, 'rope_segment')
+        // Rope
+        this.rope = this.add.tileSprite(0, 0, 6, 1, 'rope_segment')
             .setOrigin(0.5, 0)
             .setVisible(false);
 
+        // Rope sparks
         this.ropeEmitter = this.add.particles('spark').createEmitter({
             speed: 0,
-            scale: { start: 0.2, end: 0 },
-            alpha: { start: 0.7, end: 0 },
+            scale: { start: 0.25, end: 0 },
+            alpha: { start: 0.6, end: 0 },
             lifespan: 200,
-            follow: this.rope,
-            quantity: 1,
-            frequency: 50
+            frequency: 60,
+            follow: this.rope
         });
         this.ropeEmitter.stop();
 
+        // ==========================
+        // Tension System
+        // ==========================
+        this.tension = 0;
+        this.lastPointerX = null;
+        this.baseTensionThreshold = 100;
+
+        // Difficulty scaling
+        this.escapeDifficulty = 1;
+
+        // ==========================
         // UI
+        // ==========================
         this.createUI();
 
-        // Spawn objects loop
+        // Tension bar
+        this.tensionBarBg = this.add.rectangle(16, 64, 120, 10, 0x222222)
+            .setOrigin(0, 0)
+            .setScrollFactor(0);
+
+        this.tensionBar = this.add.rectangle(16, 64, 0, 10, 0xff4444)
+            .setOrigin(0, 0)
+            .setScrollFactor(0);
+
+        // ==========================
+        // Timers
+        // ==========================
         this.time.addEvent({
             delay: GAME_CONFIG.OBJECT_SPAWN_RATE,
             loop: true,
@@ -141,26 +164,44 @@ class GameScene extends Phaser.Scene {
             callbackScope: this
         });
 
-        // Hunger timer
         this.time.addEvent({
             delay: 1000,
             loop: true,
             callback: () => {
                 hunger = Math.max(0, hunger - 5);
                 this.updateUI();
-                if (hunger <= GAME_CONFIG.LOSING_HUNGER) this.scene.start('GameOverScene');
+                if (hunger <= GAME_CONFIG.LOSING_HUNGER) {
+                    this.scene.start('GameOverScene');
+                }
             }
         });
 
-        // Input
+        // ==========================
+        // Input (movement + wriggle)
+        // ==========================
         this.input.on('pointermove', pointer => {
             if (pointer.isDown) {
-                this.player.x = Phaser.Math.Clamp(pointer.x, this.player.displayWidth / 2, width - this.player.displayWidth / 2);
+                this.player.x = Phaser.Math.Clamp(
+                    pointer.x,
+                    this.player.displayWidth / 2,
+                    width - this.player.displayWidth / 2
+                );
+
+                if (this.hookedPlayer && this.lastPointerX !== null) {
+                    const delta = Math.abs(pointer.x - this.lastPointerX);
+                    this.tension += delta * 0.5;
+                }
+
+                this.lastPointerX = pointer.x;
             }
         });
+
         this.cursors = this.input.keyboard.createCursorKeys();
     }
 
+    // ==========================
+    // UI
+    // ==========================
     createUI() {
         this.ui = this.add.container(16, 16);
         this.scoreText = this.add.text(0, 0, `Score: ${score}`, { fontSize: '20px', color: '#fff' });
@@ -174,6 +215,9 @@ class GameScene extends Phaser.Scene {
         this.hungerText.setText(`Hunger: ${hunger}%`);
     }
 
+    // ==========================
+    // Spawning
+    // ==========================
     spawnObject() {
         const types = [
             { key: 'object1', value: 1 },
@@ -181,12 +225,15 @@ class GameScene extends Phaser.Scene {
             { key: 'object3', value: 15 },
             { key: 'object4', value: 5 },
             { key: 'object5', value: 5 },
-            { key: 'object6', value: 5, isHook: true }, // only one hook
+            { key: 'object6', value: 0, isHook: true },
             { key: 'object7', value: -50 }
         ];
 
         let data = Phaser.Utils.Array.GetRandom(types);
-        if (data.isHook && this.hookSpawned) data = types.find(t => !t.isHook);
+
+        if (data.isHook && (this.hookActive || this.hookCooldown)) {
+            data = types.find(t => !t.isHook);
+        }
 
         const x = Phaser.Math.Between(32, this.scale.width - 32);
         const obj = this.objects.create(x, -32, data.key).setDisplaySize(56, 56);
@@ -194,64 +241,121 @@ class GameScene extends Phaser.Scene {
         obj.isHook = data.isHook || false;
         obj.setVelocityY(Phaser.Math.Between(120, 220));
 
-        if (obj.isHook && !this.hookSpawned) {
+        if (obj.isHook) {
             this.hookActive = true;
             this.hookObject = obj;
-            this.hookSpawned = true;
             this.hookRetracting = false;
-            this.hookSpawnX = x;
-            this.rope.setVisible(true).setPosition(x, 0);
-            this.rope.height = 1;
+            this.hookedPlayer = false;
+
+            this.rope.setVisible(true);
             this.ropeEmitter.start();
         }
     }
 
     collectObject(player, obj) {
         if (obj.isHook) return;
+
         score += obj.value;
         hunger = Phaser.Math.Clamp(hunger + obj.value, 0, 100);
         obj.destroy();
         this.updateUI();
-
-        if (score >= GAME_CONFIG.WINNING_SCORE && hunger === 100) this.scene.start('VictoryScene');
-        if (hunger <= GAME_CONFIG.LOSING_HUNGER) this.scene.start('GameOverScene');
     }
 
-    update() {
-        // Player movement
-        if (this.cursors.left.isDown) this.player.x = Math.max(this.player.displayWidth / 2, this.player.x - 10);
-        if (this.cursors.right.isDown) this.player.x = Math.min(this.scale.width - this.player.displayWidth / 2, this.player.x + 10);
+    // ==========================
+    // Escape
+    // ==========================
+    breakFree() {
+        if (!this.hookObject) return;
 
-        // Remove off-screen objects
+        this.hookObject.destroy();
+        this.hookObject = null;
+
+        this.hookActive = false;
+        this.hookRetracting = false;
+        this.hookedPlayer = false;
+
+        this.tension = 0;
+        this.tensionBar.width = 0;
+
+        this.rope.setVisible(false);
+        this.ropeEmitter.stop();
+
+        this.player.y = this.scale.height * 0.85;
+
+        this.escapeDifficulty += 0.25;
+
+        this.hookCooldown = true;
+        this.time.delayedCall(3000, () => {
+            this.hookCooldown = false;
+        });
+    }
+
+    // ==========================
+    // Update Loop
+    // ==========================
+    update() {
+        // Player keyboard movement
+        if (this.cursors.left.isDown) this.player.x -= 10;
+        if (this.cursors.right.isDown) this.player.x += 10;
+
+        // Cleanup
         this.objects.getChildren().forEach(obj => {
-            if (obj.y > this.scale.height + 32) obj.destroy();
+            if (obj.y > this.scale.height + 32 && !obj.isHook) obj.destroy();
         });
 
         // Hook logic
         if (this.hookActive && this.hookObject) {
             const hook = this.hookObject;
-            const sway = Math.sin(this.time.now * 0.005) * 10;
-            this.rope.x = this.hookSpawnX + sway;
-            this.rope.height = hook.y;
 
-            if (!this.hookRetracting && Phaser.Geom.Intersects.RectangleToRectangle(this.player.getBounds(), hook.getBounds())) {
+            // Rope always tethered
+            this.rope.x = hook.x;
+            this.rope.height = hook.y + (this.tension * 0.15); // visual stretch
+
+            // Collision
+            if (!this.hookedPlayer &&
+                Phaser.Geom.Intersects.RectangleToRectangle(
+                    this.player.getBounds(),
+                    hook.getBounds()
+                )
+            ) {
+                this.hookedPlayer = true;
                 this.hookRetracting = true;
-                hook.setVelocityY(-200);
+                hook.setVelocityY(-220);
             }
 
-            if (this.hookRetracting) {
+            // Retracting
+            if (this.hookedPlayer) {
+                hook.x = this.player.x;
                 this.player.y = hook.y + 60;
+
+                // Tension decay
+                this.tension = Math.max(0, this.tension - 0.6);
+
+                const threshold = this.baseTensionThreshold * this.escapeDifficulty;
+                this.tensionBar.width = Phaser.Math.Clamp(
+                    (this.tension / threshold) * 120,
+                    0,
+                    120
+                );
+
+                if (this.tension >= threshold) {
+                    this.breakFree();
+                }
+
+                // Screen shake near escape
+                if (this.tension > threshold * 0.75) {
+                    this.cameras.main.shake(50, 0.002);
+                }
+
                 if (hook.y <= 0) {
-                    this.rope.setVisible(false);
-                    this.ropeEmitter.stop();
                     this.scene.start('GameOverScene');
                 }
             }
 
-            if (hook.y > this.scale.height + 32 && !this.hookRetracting) {
+            // Missed hook
+            if (hook.y > this.scale.height + 32 && !this.hookedPlayer) {
                 hook.destroy();
                 this.hookActive = false;
-                this.hookObject = null;
                 this.rope.setVisible(false);
                 this.ropeEmitter.stop();
             }
