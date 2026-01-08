@@ -313,6 +313,10 @@ collectObject(player, obj) {
     this.triggerCollisionEffect(); // collision with normal object
 }
     
+        this.addToStack(obj.texture.key, obj);
+        obj.destroy();
+        this.updateUI();
+    }
 triggerCollisionEffect() {
     if (this.isCollisionAnimating) return; // prevent overlapping triggers
     this.isCollisionAnimating = true;
@@ -324,12 +328,6 @@ triggerCollisionEffect() {
         this.isCollisionAnimating = false;
     });
 }
-    
-        this.addToStack(obj.texture.key, obj);
-        obj.destroy();
-        this.updateUI();
-    }
-
     updateUI() {
         this.scoreText.setText(`Score: ${score}`);
         this.hungerText.setText(`Hunger: ${hunger}%`);
