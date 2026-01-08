@@ -97,7 +97,7 @@ class GameScene extends Phaser.Scene {
 
         // Player
         this.player = this.physics.add.sprite(width / 2, height * 0.85, 'player')
-            .setDisplaySize(120, 120)
+            .setDisplaySize(200, 200)
             .setImmovable(true);
         this.player.body.setSize(60, 60).setOffset(30, 30);
 
