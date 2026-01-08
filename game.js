@@ -419,7 +419,59 @@ class GameScene extends Phaser.Scene {
             this.ropeEmitter.stop();
         }
 
+        // ==========================
+        // Victory Condition
+        // ==========================
+        if (score >= GAME_CONFIG.WINNING_SCORE) {
+            this.scene.start('VictoryScene');
+        }
+
         this.updateUI();
+    }
+}
+
+// ==========================
+// Victory Scene
+// ==========================
+class VictoryScene extends Phaser.Scene {
+    constructor() { super('VictoryScene'); }
+
+    preload() {
+        this.load.image('victory1', 'assets/Feed_Glutt/victory1.png');
+        this.load.image('victory2', 'assets/Feed_Glutt/victory2.png');
+    }
+
+    create() {
+        const { width, height } = this.scale;
+        const key = Phaser.Utils.Array.GetRandom(['victory1', 'victory2']);
+
+        this.add.image(width / 2, height / 2, key)
+            .setDisplaySize(width * 0.6, width * 0.6);
+
+        this.add.text(width / 2, height * 0.15, 'You Fed Glutt!', {
+            fontSize: 'clamp(32px, 7vw, 56px)',
+            color: '#fff'
+        }).setOrigin(0.5);
+
+        this.createButton(width / 2, height * 0.75, 'Play Again', () => this.scene.start('StartScene'));
+        this.createButton(width / 2, height * 0.85, 'Mint Collectible', () => {
+            window.open('https://opensea.io/collection/glutts', '_blank');
+        });
+    }
+
+    createButton(x, y, label, callback) {
+        const btn = this.add.text(x, y, label, {
+            fontSize: '24px',
+            color: '#fff',
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            padding: { x: 20, y: 12 },
+            align: 'center'
+        }).setOrigin(0.5).setInteractive();
+
+        btn.on('pointerdown', callback);
+        btn.on('pointerover', () => btn.setScale(1.05));
+        btn.on('pointerout', () => btn.setScale(1));
+        return btn;
     }
 }
 
@@ -445,7 +497,7 @@ const config = {
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width: 490, height: 844 },
     parent: 'game-container',
     physics: { default: 'arcade', arcade: { gravity: { y: 0 }, debug: false } },
-    scene: [StartScene, GameScene, GameOverScene]
+    scene: [StartScene, GameScene, VictoryScene, GameOverScene]
 };
 
 new Phaser.Game(config);
