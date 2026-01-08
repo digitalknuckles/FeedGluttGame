@@ -324,10 +324,7 @@ triggerCollisionEffect() {
         this.isCollisionAnimating = false;
     });
 }
-    this.addToStack(obj.texture.key, obj);
-        obj.destroy();
-        this.updateUI();
-    }
+
     updateUI() {
         this.scoreText.setText(`Score: ${score}`);
         this.hungerText.setText(`Hunger: ${hunger}%`);
