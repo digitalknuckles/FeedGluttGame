@@ -89,10 +89,10 @@ class GameScene extends Phaser.Scene {
     preload() {
         this.load.image('game_bg', 'assets/backgrounds/default_bg.png');
         this.load.image('player', 'assets/player/default_player.png');
+        this.load.image('collision_effect', 'assets/player/collision_effect.png');
         this.load.image('rope_segment', 'assets/objects/rope_segment.png');
         this.load.image('spark', 'assets/particles/spark.png');
         this.load.image('objectWild', 'assets/objects/default_object.png');
-        this.load.image('collision_effect', 'assets/player/collision_effect.png');
 
         for (let i = 1; i <= 7; i++) {
             this.load.image(`object${i}`, `assets/objects/default_object${i}.png`);
@@ -118,11 +118,11 @@ class GameScene extends Phaser.Scene {
 
         this.player.body.setSize(300, 150).setOffset(350, 450);
 
-        // Falling Objects
+        // Group for falling objects
         this.objects = this.physics.add.group();
         this.physics.add.overlap(this.player, this.objects, this.collectObject, null, this);
 
-        // Rope
+        // Rope setup
         this.rope = this.add.tileSprite(0, 0, 6, 1, 'rope_segment')
             .setOrigin(0.5, 0)
             .setVisible(false)
@@ -141,7 +141,7 @@ class GameScene extends Phaser.Scene {
         });
         this.ropeEmitter.stop();
 
-        // Hook State
+        // Hook state
         this.hookActive = false;
         this.hookCooldown = false;
         this.hookObject = null;
@@ -155,7 +155,7 @@ class GameScene extends Phaser.Scene {
         this.baseTensionThreshold = 100;
         this.escapeDifficulty = 1;
 
-        // Stack System
+        // Stack system
         this.stack = [];
         this.stackIcons = [];
         this.stackIconSize = 32;
@@ -169,7 +169,6 @@ class GameScene extends Phaser.Scene {
         this.tensionBarBg = this.add.rectangle(16, 64, 120, 10, 0x222222)
             .setOrigin(0, 0)
             .setDepth(DEPTH.UI);
-
         this.tensionBar = this.add.rectangle(16, 64, 0, 10, 0xff4444)
             .setOrigin(0, 0)
             .setDepth(DEPTH.UI);
@@ -197,12 +196,7 @@ class GameScene extends Phaser.Scene {
         // Input
         this.input.on('pointermove', pointer => {
             if (!pointer.isDown) return;
-
-            this.player.x = Phaser.Math.Clamp(
-                pointer.x,
-                this.player.displayWidth / 2,
-                width - this.player.displayWidth / 2
-            );
+            this.player.x = Phaser.Math.Clamp(pointer.x, this.player.displayWidth / 2, width - this.player.displayWidth / 2);
 
             if (this.hookedPlayer && this.lastPointerX !== null) {
                 this.tension += Math.abs(pointer.x - this.lastPointerX) * 0.5;
@@ -213,9 +207,10 @@ class GameScene extends Phaser.Scene {
 
         this.cursors = this.input.keyboard.createCursorKeys();
 
-        // ==========================
-        // Physics Debug
-        // ==========================
+        // Collision animation flag
+        this.isCollisionAnimating = false;
+
+        // Physics debug
         if (DEBUG_CONFIG.PHYSICS) {
             this.physics.world.drawDebug = true;
             this.physics.world.debugGraphic.setDepth(DEPTH.DEBUG);
@@ -223,95 +218,45 @@ class GameScene extends Phaser.Scene {
     }
 
     // ==========================
-    // UI
+    // Collision Animation
     // ==========================
-    createUI() {
-        this.ui = this.add.container(16, 16);
-        this.scoreText = this.add.text(0, 0, `Score: ${score}`, { fontSize: '18px', color: '#fff' });
-        this.hungerText = this.add.text(0, 22, `Hunger: ${hunger}%`, { fontSize: '18px', color: '#0f0' });
-        this.staminaBg = this.add.rectangle(0, 46, 120, 8, 0x222222).setOrigin(0, 0.5);
-        this.staminaBar = this.add.rectangle(0, 46, 120, 8, 0x00ffff).setOrigin(0, 0.5);
+    triggerCollisionEffect() {
+        if (this.isCollisionAnimating) return; // prevent overlapping triggers
+        this.isCollisionAnimating = true;
 
-        this.ui.add([
-            this.scoreText,
-            this.hungerText,
-            this.staminaBg,
-            this.staminaBar
-        ]);
-    }
+        // Raise depth so effect is visible
+        this.player.setDepth(DEPTH.OBJECTS + 1);
 
-    updateUI() {
-        this.scoreText.setText(`Score: ${score}`);
-        this.hungerText.setText(`Hunger: ${hunger}%`);
-        this.staminaBar.width = Phaser.Math.Clamp(
-            120 * (this.stamina / this.maxStamina),
-            0,
-            120
-        );
+        // Swap texture
+        this.player.setTexture('collision_effect');
+
+        this.time.delayedCall(500, () => {
+            this.player.setTexture('player'); // reset default
+            this.player.setDepth(DEPTH.PLAYER); // restore depth
+            this.isCollisionAnimating = false;
+        });
     }
 
     // ==========================
-    // Spawning & Collection
+    // Object Collection
     // ==========================
-    spawnObject() {
-        const types = [
-            { key: 'object1', value: 10 },
-            { key: 'object2', value: 10 },
-            { key: 'object3', value: 20 },
-            { key: 'object4', value: 20 },
-            { key: 'object5', value: 20 },
-            { key: 'object6', value: 0, isHook: true },
-            { key: 'object7', value: -50 },
-            { key: 'objectWild', value: 10, isWild: true }
-        ];
-
-        let data = Phaser.Utils.Array.GetRandom(types);
-        if (data.isHook && (this.hookActive || this.hookCooldown)) {
-            data = types.find(t => !t.isHook);
-        }
-
-        const obj = this.objects.create(
-            Phaser.Math.Between(32, this.scale.width - 32),
-            -32,
-            data.key
-        )
-            .setDisplaySize(56, 56)
-            .setDepth(DEPTH.OBJECTS)
-            .setVelocityY(Phaser.Math.Between(120, 220));
-
-        obj.value = data.value;
-        obj.isHook = data.isHook || false;
-        obj.isWild = data.isWild || false;
-
+    collectObject(player, obj) {
         if (obj.isHook) {
-            this.hookActive = true;
-            this.hookObject = obj;
-            this.hookedPlayer = false;
-            this.rope.setVisible(true);
-            this.ropeEmitter.start();
+            this.triggerCollisionEffect();  // hook collision effect
+            return;
         }
+
+        // Normal object collision
+        score += obj.value;
+        hunger = Phaser.Math.Clamp(hunger + obj.value, 0, 100);
+        this.stamina = Phaser.Math.Clamp(this.stamina + Math.max(5, obj.value), 0, this.maxStamina);
+
+        this.addToStack(obj.texture.key, obj);
+        obj.destroy();
+        this.updateUI();
+
+        this.triggerCollisionEffect(); // normal collision effect
     }
-
-collectObject(player, obj) {
-    if (obj.isHook) {
-        this.triggerCollisionEffect();  // hook collision
-        return;
-    }
-
-    score += obj.value;
-    hunger = Phaser.Math.Clamp(hunger + obj.value, 0, 100);
-    this.stamina = Phaser.Math.Clamp(
-        this.stamina + Math.max(5, obj.value),
-        0,
-        this.maxStamina
-    );
-
-    this.addToStack(obj.texture.key, obj);
-    obj.destroy();
-    this.updateUI();
-
-    this.triggerCollisionEffect(); // collision with normal object
-}
 
 triggerCollisionEffect() {
     if (this.isCollisionAnimating) this.time.removeAllEvents(); // cancel previous revert
