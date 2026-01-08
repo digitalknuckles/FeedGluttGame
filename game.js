@@ -624,7 +624,7 @@ class VictoryScene extends Phaser.Scene {
         }).setOrigin(0.5);
 
         this.createButton(width / 2, height * 0.75, 'Play Again', () => this.scene.start('StartScene'));
-        this.createButton(width / 2, height * 0.85, 'Mint Collectible', () => {
+        this.createButton(width / 2, height * 0.85, 'View Collection', () => {
             window.open('https://opensea.io/collection/glutts', '_blank');
         });
     }
